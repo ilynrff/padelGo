@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(USER)
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+}
+
+model Court {
+  id          String    @id @default(uuid())
+  name        String
+  location    String
+  price       Float
+  description String?
+  isActive    Boolean   @default(true)
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  userId        String
+  courtId       String
+  date          DateTime      @db.Date
+  timeSlot      String        // e.g., '10:00-11:00'
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  user          User          @relation(fields: [userId], references: [id])
+  court         Court         @relation(fields: [courtId], references: [id])
+  createdAt     DateTime      @default(now())
+
+  // Prevent double booking on same court
+  @@unique([courtId, date, timeSlot]) 
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
