@@ -55,7 +55,7 @@ export default function RegisterPage() {
           <Input 
             label="Email Address" 
             type="email" 
-            placeholder="player@padelx.com" 
+            placeholder="player@padelgo.id" 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />

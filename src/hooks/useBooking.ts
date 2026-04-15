@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export const MOCK_COURTS = [
-  { id: 1, name: "Padel Court A (Premium)", location: "Kuningan, Jaksel", price: 150000, image: "/images/court-premium.jpg" },
-  { id: 2, name: "Indoor Panoramic Court", location: "Menteng, Jakpus", price: 200000, image: "/images/court-1.jpg" },
-  { id: 3, name: "Outdoor Classic Court", location: "Kemang, Jaksel", price: 120000, image: "/images/court-3.jpg" },
+  { id: 1, name: "Padel Court A (Premium)", location: "Banyumanik, Semarang", price: 150000, image: "/images/court-premium.jpg" },
+  { id: 2, name: "Indoor Panoramic Court", location: "Tembalang, Semarang", price: 200000, image: "/images/court-1.jpg" },
+  { id: 3, name: "Outdoor Classic Court", location: "Simpang Lima, Semarang", price: 120000, image: "/images/court-3.jpg" },
 ];
 
 export const MOCK_TIME_SLOTS = [

@@ -24,7 +24,7 @@ export default function Navbar() {
         <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2 group">
               <span className="font-extrabold text-2xl tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
-                Padel<span className="text-blue-600 group-hover:text-slate-900 transition-colors">X</span>
+                Padel<span className="text-blue-600 group-hover:text-slate-900 transition-colors">Go</span>
               </span>
             </Link>
 
