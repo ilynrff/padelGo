@@ -23,10 +23,10 @@ export const MOCK_TIME_SLOTS = [
 ];
 
 export function useBooking() {
-  const router = useRouter(); // Router di deklarasikan di sini
+  const router = useRouter();
   const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -39,8 +39,16 @@ export function useBooking() {
     return d;
   });
 
+  const toggleSlot = (time: string) => {
+    setSelectedSlots(prev => 
+      prev.includes(time) 
+        ? prev.filter(t => t !== time)
+        : [...prev, time].sort() // Sort to maintain chronological order
+    );
+  };
+
   const checkout = async () => {
-    if (!selectedCourt || !selectedDate || !selectedSlot) {
+    if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
       setError("Mohon lengkapi pilihan lapangan, tanggal, dan jam.");
       setSuccessMsg('');
       setIsToastOpen(true);
@@ -54,10 +62,10 @@ export function useBooking() {
     // Simulate network latency & checking
     await new Promise(res => setTimeout(res, 1200));
 
-    // Simulate 20% bentrok chance
+    // Simulate 20% bentrok chance per request
     const isBentrok = Math.random() < 0.2;
     if (isBentrok) {
-      setError("Mohon maaf, slot ini baru saja diambil orang lain.");
+      setError("Mohon maaf, salah satu slot yang dipilih baru saja diambil orang lain.");
       setSuccessMsg('');
       setIsLoading(false);
       setIsToastOpen(true);
@@ -69,11 +77,11 @@ export function useBooking() {
         courtName: courtData?.name || "",
         location: courtData?.location || "",
         date: selectedDate.toString(),
-        time: selectedSlot,
-        price: courtData?.price.toString() || "0"
+        time: selectedSlots.join(", "),
+        price: (courtData?.price || 0).toString(),
+        duration: selectedSlots.length.toString()
       });
       
-      // Tunggu sedetk sebelum routing untuk estetika Loading
       router.push(`/booking/success?${query.toString()}`);
     }
   };
@@ -86,8 +94,9 @@ export function useBooking() {
     setSelectedCourt,
     selectedDate,
     setSelectedDate,
-    selectedSlot,
-    setSelectedSlot,
+    selectedSlots,
+    setSelectedSlots,
+    toggleSlot,
     checkout,
     isLoading,
     error,

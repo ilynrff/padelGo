@@ -11,9 +11,9 @@ interface TimeSlotProps {
 export function TimeSlot({ time, isAvailable, isSelected, price, onSelect }: TimeSlotProps) {
   if (!isAvailable) {
     return (
-      <button disabled className="w-full relative px-2 py-4 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border-2 border-slate-200 rounded-2xl font-bold flex flex-col items-center">
+      <button disabled className="w-full relative px-2 py-4 bg-red-50 text-red-400 opacity-60 cursor-not-allowed border-2 border-red-200 rounded-2xl font-bold flex flex-col items-center">
          <span className="text-sm md:text-base">{time}</span>
-         <span className="text-xs font-semibold mt-1">Booked</span>
+         <span className="text-xs font-semibold mt-1">Full</span>
       </button>
     );
   }
@@ -33,8 +33,9 @@ export function TimeSlot({ time, isAvailable, isSelected, price, onSelect }: Tim
        </span>
 
        {/* Hover Info tooltip */}
-       <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl">
-         Rp {price.toLocaleString('id-ID')}
+       <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-10">
+         Rp {(price).toLocaleString('id-ID')} / jam
+         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
        </div>
     </button>
   );
