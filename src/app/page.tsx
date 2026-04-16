@@ -188,7 +188,7 @@ export default function Home() {
             Siap main padel hari ini?
           </h2>
           <p className="text-blue-100 font-medium text-lg mb-10 leading-relaxed">
-            Jangan sampai kehabisan slot favorit kamu. Booking sekarang dan amankan jadwalmu dalam 30 detik.
+            Jangan sampai kehabisan lapangan favorit kamu. Booking sekarang dan amankan jadwalmu dalam 30 detik.
           </p>
           <Link href="/booking">
             <button className="bg-white text-blue-700 font-black text-lg px-12 py-5 rounded-2xl transition-all duration-300 hover:bg-blue-50 hover:scale-105 hover:shadow-[0_16px_50px_-8px_rgba(0,0,0,0.25)] active:scale-95 shadow-xl">
