@@ -91,7 +91,7 @@ export default function BookingPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 font-medium">Tanggal</span>
-                <span className="font-bold text-slate-900">{selectedDate} Bulan Ini</span>
+                <span className="font-bold text-slate-900">{selectedDate} Bulan April</span>
               </div>
               <div className="flex justify-between items-start">
                 <span className="text-slate-500 font-medium">Jam</span>
@@ -194,7 +194,7 @@ export default function BookingPage() {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900">Pilih Tanggal</h2>
               </div>
-              <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar">
+              <div className="flex overflow-x-auto gap-3 pt-3 pb-6 px-2 -mx-2 snap-x hide-scrollbar">
                 {dates.map((d, idx) => {
                   const dayStr = d.toLocaleDateString("id-ID", { weekday: 'short' });
                   const dateNum = d.getDate();
@@ -279,7 +279,7 @@ export default function BookingPage() {
                      <div>
                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tanggal</p>
                        <p className={`font-bold ${isStep2Done ? 'text-slate-900' : 'text-slate-300'}`}>
-                         {selectedDate ? `${selectedDate} Bulan Ini` : "Belum dipilih"}
+                         {selectedDate ? `${selectedDate} Bulan April` : "Belum dipilih"}
                        </p>
                      </div>
                   </div>

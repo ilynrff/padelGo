@@ -11,7 +11,7 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
   return (
     <div
       onClick={onSelect}
-      className={`bg-white rounded-[2rem] border-2 transition-all duration-300 cursor-pointer overflow-hidden ${
+      className={`bg-white rounded-[2rem] border-2 transition-all duration-300 cursor-pointer overflow-hidden transform-gpu ${
         isSelected
           ? 'border-blue-600 shadow-[0_8px_30px_-4px_rgba(37,99,235,0.25)] -translate-y-1.5'
           : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:-translate-y-1'
