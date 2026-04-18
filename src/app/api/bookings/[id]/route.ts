@@ -1,38 +1,31 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (!session || (session.user as any).role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { status } = await req.json();
+    if (!status) {
+      return NextResponse.json({ error: "Status is required" }, { status: 400 });
+    }
 
-    const booking = await prisma.booking.findUnique({
-      where: { id }
+    const updatedBooking = await prisma.booking.update({
+      where: { id: params.id },
+      data: { status },
     });
 
-    if (!booking) {
-      return new NextResponse("Not found", { status: 404 });
-    }
-
-    // Must be the owner or admin
-    // @ts-ignore
-    if (booking.userId !== session.user.id && session.user.role !== "ADMIN") {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-
-    const updated = await prisma.booking.update({
-      where: { id },
-      data: { status: "CANCELLED" }
-    });
-
-    return NextResponse.json(updated);
-  } catch (error) {
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json(updatedBooking);
+  } catch (error: any) {
+    console.error("Error updating booking:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

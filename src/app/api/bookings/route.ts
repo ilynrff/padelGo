@@ -1,119 +1,109 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 export async function GET(req: Request) {
+  console.log("API: Fetching bookings...");
   try {
-    const { searchParams } = new URL(req.url);
-    const courtId = searchParams.get("courtId");
-    const date = searchParams.get("date");
-
-    if (courtId && date) {
-      const bookings = await prisma.booking.findMany({
-        where: {
-          courtId,
-          date: new Date(date),
-        },
-      });
-      return NextResponse.json(bookings);
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      console.warn("API: Unauthorized booking fetch attempt.");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const userRole = (session.user as any).role;
+    const userId = (session.user as any).id;
+    console.log(`API: Fetching for user ${userId} with role ${userRole}`);
 
-    // @ts-ignore
-    if (session.user.role === "ADMIN") {
-      const allBookings = await prisma.booking.findMany({
-        include: { user: true, court: true },
-        orderBy: { createdAt: 'desc' }
-      });
-      return NextResponse.json(allBookings);
-    } else {
-      const userBookings = await prisma.booking.findMany({
-        // @ts-ignore
-        where: { userId: session.user.id },
-        include: { court: true },
-        orderBy: { date: 'desc' }
-      });
-      return NextResponse.json(userBookings);
-    }
-  } catch (error) {
-    return new NextResponse("Internal Error", { status: 500 });
+    const bookings = await prisma.booking.findMany({
+      where: userRole === "ADMIN" ? {} : { userId },
+      include: {
+        user: { select: { name: true, email: true } },
+        court: { select: { name: true, location: true, price: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    console.log(`API: Found ${bookings.length} bookings.`);
+    return NextResponse.json(bookings, { status: 200 });
+  } catch (err: any) {
+    console.error("API Error [GET /api/bookings]:", err);
+    return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
+  console.log("API: Creating new booking...");
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (!session) {
+      console.warn("API: Unauthorized booking creation attempt.");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = (session.user as any).id;
 
     const body = await req.json();
-    const { courtId, date, timeSlot } = body;
-
-    if (!courtId || !date || !timeSlot) {
-      return new NextResponse("Missing fields", { status: 400 });
-    }
-
-    const targetDate = new Date(date);
+    const { courtId, date, timeSlots } = body;
+    console.log(`API: Booking request from ${userId} for court ${courtId} on date ${date} with slots:`, timeSlots);
     
-    // 1. Check if date is in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (targetDate < today) {
-        return new NextResponse("Cannot book in the past", { status: 400 });
+    if (!courtId || !date || !timeSlots || !Array.isArray(timeSlots) || timeSlots.length === 0) {
+      return NextResponse.json({ error: "Missing required booking details." }, { status: 400 });
     }
 
-    // 2. Prevent Double Booking of the same court slot
-    const existingCourtBooking = await prisma.booking.findFirst({
-      where: {
-        courtId,
-        date: targetDate,
-        timeSlot,
-        status: { not: "CANCELLED" }
-      }
-    });
+    const bookingDate = new Date(date);
 
-    if (existingCourtBooking) {
-      return new NextResponse("Time slot already booked", { status: 400 });
-    }
-
-    // 3. User cannot book 2 different courts at the same time
-    const existingUserBooking = await prisma.booking.findFirst({
+    const result = await prisma.$transaction(async (tx) => {
+      console.log("API: Starting transaction check for double booking...");
+      const existingBookings = await tx.booking.findMany({
         where: {
-            // @ts-ignore
-            userId: session.user.id,
-            date: targetDate,
-            timeSlot,
-            status: { not: "CANCELLED" }
+          courtId,
+          date: bookingDate,
+          timeSlot: { in: timeSlots },
+          status: { in: ["PENDING", "CONFIRMED"] }
         }
-    });
+      });
 
-    if (existingUserBooking) {
-        return new NextResponse("You already have a booking at this time", { status: 400 });
-    }
-
-    // Create booking as PENDING and UNPAID
-    const booking = await prisma.booking.create({
-      data: {
-        // @ts-ignore
-        userId: session.user.id,
-        courtId,
-        date: targetDate,
-        timeSlot,
-        status: "PENDING",
-        paymentStatus: "UNPAID"
+      if (existingBookings.length > 0) {
+        console.warn("API: Double booking detected!", existingBookings.map(b => b.timeSlot));
+        throw new Error("SLOT_TAKEN");
       }
+
+      const court = await tx.court.findUnique({ where: { id: String(courtId) } });
+      if (!court) {
+        console.error(`API: Court ID ${courtId} not found.`);
+        throw new Error("COURT_NOT_FOUND");
+      }
+
+      console.log(`API: Creating ${timeSlots.length} slot entries...`);
+      const createdBookings = [];
+      for (const t of timeSlots) {
+         const b = await tx.booking.create({
+           data: {
+             userId,
+             courtId: String(courtId),
+             date: bookingDate,
+             timeSlot: t,
+             status: "PENDING",
+             paymentStatus: "UNPAID"
+           }
+         });
+         createdBookings.push(b);
+      }
+      return { createdBookings, courtPrice: court.price };
     });
 
-    return NextResponse.json(booking);
-  } catch (error: any) {
-    console.log(error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.log(`API: Booking success for ID(s):`, result.createdBookings.map(b => b.id));
+    return NextResponse.json({ success: true, count: result.createdBookings.length, priceAssigned: result.courtPrice }, { status: 201 });
+
+  } catch (err: any) {
+    console.error("API Error [POST /api/bookings]:", err);
+    if (err.message === "SLOT_TAKEN") {
+      return NextResponse.json({ error: "Beberapa jam yang dipilih sudah direservasi oleh pengguna lain. Silakan pilih jadwal lain." }, { status: 409 });
+    }
+    if (err.message === "COURT_NOT_FOUND") {
+       return NextResponse.json({ error: "Lapangan tidak valid." }, { status: 404 });
+    }
+    return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
   }
 }

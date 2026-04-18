@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { AdminCourt, MOCK_ADMIN_COURTS } from "@/lib/adminData";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 
 export function CourtManager() {
-  const [courts, setCourts] = useState<AdminCourt[]>(MOCK_ADMIN_COURTS);
+  const [courts, setCourts] = useState<any[]>([]);
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
-  const [editingCourt, setEditingCourt] = useState<AdminCourt | null>(null);
+  const [editingCourt, setEditingCourt] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/courts')
+      .then(res => res.json())
+      .then(data => {
+        if(Array.isArray(data)) setCourts(data);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +29,10 @@ export function CourtManager() {
     setEditingCourt(null);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     if (confirm("Yakin ingin menghapus lapangan ini?")) {
       setCourts(courts.filter(c => c.id !== id));
+      // TODO: implement real API delete if needed
     }
   };
 

@@ -2,7 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 
 interface CourtCardProps {
-  court: { id: number; name: string; location: string; price: number; image: string };
+  court: { id: string; name: string; location: string; price: number; image?: string; description?: string };
   isSelected: boolean;
   onSelect: () => void;
 }
@@ -17,16 +17,22 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
           : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:-translate-y-1'
       }`}
     >
-      {/* Court Image — zoom dikelola sendiri pakai wrapper hover */}
-      <div className="h-40 w-full relative overflow-hidden">
+      {/* Court Image */}
+      <div className="h-40 w-full relative overflow-hidden bg-slate-200">
         <div className="absolute inset-0 transition-transform duration-500 hover:scale-110">
-          <Image
-            src={court.image}
-            alt={court.name}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 33vw"
-          />
+          {court.image ? (
+            <Image
+              src={court.image}
+              alt={court.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 33vw"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
+              Court Image
+            </div>
+          )}
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none"></div>
 

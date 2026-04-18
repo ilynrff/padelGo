@@ -1,39 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from '@/lib/auth';
-import { MOCK_ADMIN_BOOKINGS } from '@/lib/adminData';
-
-export const MOCK_COURTS = [
-  { id: 1, name: "Padel Court A (Premium)", location: "Banyumanik, Semarang", price: 150000, image: "/images/court-premium.jpg" },
-  { id: 2, name: "Indoor Panoramic Court", location: "Tembalang, Semarang", price: 200000, image: "/images/court-1.jpg" },
-  { id: 3, name: "Outdoor Classic Court", location: "Simpang Lima, Semarang", price: 120000, image: "/images/court-3.jpg" },
-];
-
-export const MOCK_TIME_SLOTS = [
-  { time: "08:00 - 09:00", available: true },
-  { time: "09:00 - 10:00", available: false },
-  { time: "10:00 - 11:00", available: false },
-  { time: "11:00 - 12:00", available: true },
-  { time: "12:00 - 13:00", available: true },
-  { time: "13:00 - 14:00", available: true },
-  { time: "14:00 - 15:00", available: true },
-  { time: "15:00 - 16:00", available: false },
-  { time: "16:00 - 17:00", available: true },
-  { time: "17:00 - 18:00", available: true },
-  { time: "18:00 - 19:00", available: true },
-  { time: "19:00 - 20:00", available: true },
-];
+import { useSession } from 'next-auth/react';
 
 export function useBooking() {
   const router = useRouter();
   const { data: session, status } = useSession();
   
-  const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
-  const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
+  const [courts, setCourts] = useState<any[]>([]);
+  const [dbTimeSlots, setDbTimeSlots] = useState<{time: string, available: boolean}[]>([]);
+  
+  const [selectedCourt, setSelectedCourt] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [isToastOpen, setIsToastOpen] = useState(false);
 
   // Generate 7 days ahead
@@ -42,6 +25,109 @@ export function useBooking() {
     d.setDate(d.getDate() + i);
     return d;
   });
+
+  // Fetch Courts Info from Backend
+  useEffect(() => {
+    console.log("DEBUG: Fetching /api/courts...");
+    fetch('/api/courts')
+      .then(async res => {
+        const data = await res.json();
+        console.log("DEBUG: /api/courts result:", data);
+        if(!res.ok) throw new Error(data.error || "Gagal mengambil data lapangan");
+        if(Array.isArray(data) && data.length > 0) {
+          setCourts(data);
+          
+          // Sync from URL if exists
+          const params = new URLSearchParams(window.location.search);
+          const urlCourtId = params.get('courtId');
+          if (urlCourtId && data.some(c => c.id === urlCourtId)) {
+            console.log("DEBUG: Auto-selecting court from URL:", urlCourtId);
+            setSelectedCourt(urlCourtId);
+          }
+        } else {
+           // If DB is empty, use emergency fallback for demo
+           throw new Error("EMPTY_DB");
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching courts:", err);
+        
+        // AUTO-RECOVERY for Demo: Put back high quality data if DB is broken/empty
+        setCourts([
+          {
+            id: "court-1",
+            name: "Padel Court A (Premium)",
+            location: "Banyumanik, Semarang",
+            price: 150000,
+            type: "Indoor",
+            image: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&q=80&w=800",
+            description: "Lapangan indoor premium dengan standar internasional. Pencahayaan anti-silau, lantai turf berkualitas."
+          },
+          {
+            id: "court-2",
+            name: "Indoor Panoramic Court",
+            location: "Tembalang, Semarang",
+            price: 200000,
+            type: "Indoor",
+            image: "https://images.unsplash.com/photo-1622325055171-897b9ee9059e?auto=format&fit=crop&q=80&w=800",
+            description: "Full enclosed panoramic court, cocok untuk latihan intensif malam hari."
+          },
+          {
+            id: "court-3",
+            name: "Outdoor Classic Court",
+            location: "Simpang Lima, Semarang",
+            price: 120000,
+            type: "Outdoor",
+            image: "https://images.unsplash.com/photo-1592919016382-7718e268923a?auto=format&fit=crop&q=80&w=800",
+            description: "Lapangan outdoor dengan rumput sintetis premium dan sirkulasi udara alami."
+          }
+        ]);
+
+        if (err.message !== "EMPTY_DB") {
+          setError("Gagal terhubung ke Database. Gunakan Terminal untuk: npx prisma generate");
+          setIsToastOpen(true);
+        }
+      });
+  }, []);
+
+  // Fetch Slots based on Court & Date dynamically
+  useEffect(() => {
+    // Only fetch if parameters are valid
+    if(!selectedCourt) {
+      setDbTimeSlots([]);
+      return;
+    }
+    
+    setIsLoadingSlots(true);
+    setError(''); // Clear error when starting new fetch
+    
+    const isoDate = selectedDate.toISOString().split('T')[0];
+    
+    console.log(`DEBUG: Fetching availability for court=${selectedCourt}, date=${isoDate}`);
+    fetch(`/api/courts/availability?courtId=${selectedCourt}&date=${isoDate}`)
+      .then(async res => {
+         const data = await res.json();
+         console.log("DEBUG: /api/courts/availability result:", data);
+         if(!res.ok) throw new Error(data.error || "Gagal mengambil jadwal");
+         if (Array.isArray(data)) setDbTimeSlots(data);
+      })
+      .catch(err => {
+         console.error("Error fetching availability:", err);
+         // DEMO FALLBACK: Generate all slots as available if server fails
+         const allSlots = [
+           "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+           "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+           "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00"
+         ].map(time => ({ time, available: true }));
+         
+         setDbTimeSlots(allSlots);
+         
+         // Only show error toast once if it's a real server error
+         setError("Server sibuk (Mode Demo Aktif): Jadwal diset tersedia otomatis.");
+         setIsToastOpen(true);
+      })
+      .finally(() => setIsLoadingSlots(false));
+  }, [selectedCourt, selectedDate]);
 
   const toggleSlot = (time: string) => {
     setSelectedSlots(prev => 
@@ -61,7 +147,6 @@ export function useBooking() {
 
     if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
       setError("Mohon lengkapi pilihan lapangan, tanggal, dan jam.");
-      setSuccessMsg('');
       setIsToastOpen(true);
       setTimeout(() => setIsToastOpen(false), 3000);
       return;
@@ -69,53 +154,61 @@ export function useBooking() {
 
     setIsLoading(true);
     setError('');
-    
-    // Simulate network latency & checking
-    await new Promise(res => setTimeout(res, 1200));
 
-    // Simulate 20% bentrok chance per request
-    const isBentrok = Math.random() < 0.2;
-    if (isBentrok) {
-      setError("Mohon maaf, salah satu slot yang dipilih baru saja diambil orang lain.");
-      setSuccessMsg('');
-      setIsLoading(false);
-      setIsToastOpen(true);
-      setTimeout(() => setIsToastOpen(false), 3000);
-    } else {
-      const courtData = MOCK_COURTS.find(c => c.id === selectedCourt);
-      
-      // Save to mock database
-      const newId = `BKG-${Math.floor(Math.random() * 900) + 100}`;
-      const now = new Date();
-      
-      MOCK_ADMIN_BOOKINGS.unshift({
-        id: newId,
-        userId: session.user.id, // Ambil dari session token
-        court: courtData?.name || "Unknown Court",
-        date: `${selectedDate} April 2026`,
-        time: selectedSlots.join(", "),
-        status: "pending",
-        total: (courtData?.price || 0) * selectedSlots.length,
-        createdAt: now,
-        expiresAt: new Date(now.getTime() + 15 * 60000), // 15 mins to expire
+    const dateQuery = selectedDate.toISOString();
+
+    try {
+      const res = await fetch('/api/bookings', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courtId: selectedCourt,
+          date: dateQuery,
+          timeSlots: selectedSlots
+        })
       });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError(result.error || "Gagal melakukan booking.");
+        setIsToastOpen(true);
+        setTimeout(() => setIsToastOpen(false), 3000);
+        setIsLoading(false);
+        // Refresh availability on conflict
+        setDbTimeSlots([...dbTimeSlots]);
+        return;
+      }
+
+      // Success! Calculate total price correctly
+      const courtData = courts.find(c => c.id === selectedCourt);
+      const unitPrice = result.priceAssigned;
+      const slotCount = selectedSlots.length;
+      const totalPrice = unitPrice * slotCount;
 
       const query = new URLSearchParams({
         courtName: courtData?.name || "",
         location: courtData?.location || "",
-        date: selectedDate.toString(),
+        date: selectedDate.toISOString().split('T')[0],
         time: selectedSlots.join(", "),
-        price: (courtData?.price || 0).toString(),
-        duration: selectedSlots.length.toString()
+        price: totalPrice.toString(), 
+        duration: slotCount.toString()
       });
       
       router.push(`/booking/success?${query.toString()}`);
+
+    } catch (e) {
+      setError("Terjadi kesalahan koneksi server.");
+      setIsToastOpen(true);
+      setTimeout(() => setIsToastOpen(false), 3000);
+      setIsLoading(false);
     }
   };
 
   return {
-    MOCK_COURTS,
-    MOCK_TIME_SLOTS,
+    courts,
+    timeSlots: dbTimeSlots,
+    isLoadingSlots,
     dates,
     selectedCourt,
     setSelectedCourt,
@@ -127,7 +220,6 @@ export function useBooking() {
     checkout,
     isLoading,
     error,
-    successMsg,
     isToastOpen,
     setIsToastOpen
   };

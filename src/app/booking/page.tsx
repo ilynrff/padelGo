@@ -10,8 +10,9 @@ import Image from "next/image";
 
 export default function BookingPage() {
   const {
-    MOCK_COURTS,
-    MOCK_TIME_SLOTS,
+    courts,
+    timeSlots,
+    isLoadingSlots,
     dates,
     selectedCourt,
     setSelectedCourt,
@@ -29,9 +30,9 @@ export default function BookingPage() {
   } = useBooking();
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [previewCourtInfo, setPreviewCourtInfo] = useState<number | null>(null);
+  const [previewCourtInfo, setPreviewCourtInfo] = useState<string | null>(null);
 
-  const selectedCourtData = MOCK_COURTS.find(c => c.id === selectedCourt);
+  const selectedCourtData = courts.find(c => c.id === selectedCourt);
   const courtPrice = selectedCourtData?.price || 0;
   const totalPrice = courtPrice * selectedSlots.length;
 
@@ -51,12 +52,11 @@ export default function BookingPage() {
     checkout();
   };
 
-  // Logic smart suggestion
   let smartSuggestion = null;
   if (selectedCourt && selectedDate) {
-    const firstUnavailableIndex = MOCK_TIME_SLOTS.findIndex(s => !s.available);
+    const firstUnavailableIndex = timeSlots.findIndex(s => !s.available);
     if (firstUnavailableIndex !== -1) {
-      const nextAvailable = MOCK_TIME_SLOTS.slice(firstUnavailableIndex).find(s => s.available);
+      const nextAvailable = timeSlots.slice(firstUnavailableIndex).find(s => s.available);
       if (nextAvailable) {
         smartSuggestion = `Tip: Jam buka terdekat yang masih kosong adalah ${nextAvailable.time}`;
       }
@@ -65,7 +65,6 @@ export default function BookingPage() {
 
   return (
     <div className="flex-1 bg-slate-50 relative pb-40 pt-8">
-      
       <Toast 
          isOpen={isToastOpen} 
          message={error || successMsg} 
@@ -73,7 +72,6 @@ export default function BookingPage() {
          onClose={() => setIsToastOpen(false)} 
       />
 
-      {/* CONFIRMATION MODAL */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
@@ -91,7 +89,7 @@ export default function BookingPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 font-medium">Tanggal</span>
-                <span className="font-bold text-slate-900">{selectedDate} Bulan April</span>
+                <span className="font-bold text-slate-900">{selectedDate.getDate()} {selectedDate.toLocaleDateString('id-ID', { month: 'long' })}</span>
               </div>
               <div className="flex justify-between items-start">
                 <span className="text-slate-500 font-medium">Jam</span>
@@ -120,36 +118,47 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* COURT PREVIEW MODAL */}
       {previewCourtInfo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={() => setPreviewCourtInfo(null)}>
           <div className="bg-white rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
             <button onClick={() => setPreviewCourtInfo(null)} className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-md transition-colors">
               ✕
             </button>
-            <div className="relative h-64 md:h-80 w-full">
-              <Image src={MOCK_COURTS.find(c => c.id === previewCourtInfo)?.image || ""} alt="Court Preview" fill className="object-cover" />
+            <div className="relative h-64 md:h-80 w-full bg-slate-200 flex items-center justify-center">
+              {(() => {
+                const previewCourt = courts.find(c => c.id === previewCourtInfo);
+                if (previewCourt?.image) {
+                  return <Image src={previewCourt.image} alt="Court" fill className="object-cover" />;
+                }
+                return <p className="font-bold text-slate-400">Padel Court Banner</p>;
+              })()}
             </div>
             <div className="p-6 md:p-8">
-              <div className="inline-block bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Detail Lapangan</div>
-              <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">{MOCK_COURTS.find(c => c.id === previewCourtInfo)?.name}</h3>
-              <p className="text-slate-500 font-medium flex items-center gap-2 mb-6">
-                 📍 {MOCK_COURTS.find(c => c.id === previewCourtInfo)?.location}
-              </p>
-              <p className="text-slate-600 leading-relaxed font-medium mb-8">
-                Nikmati bermain padel di lapangan premium dengan standar internasional. Dilengkapi dengan fasilitas terbaik, pencahayaan anti-silau, dan lingkungan yang asri. Cocok untuk semua level pemain, dari pemula hingga profesional.
-              </p>
-              <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <span className="font-bold text-slate-500">Harga Per Jam</span>
-                <span className="text-xl font-black text-blue-600">Rp {MOCK_COURTS.find(c => c.id === previewCourtInfo)?.price.toLocaleString('id-ID')}</span>
-              </div>
+              {(() => {
+                const previewCourt = courts.find(c => c.id === previewCourtInfo);
+                return (
+                  <>
+                    <div className="inline-block bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Detail Lapangan</div>
+                    <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">{previewCourt?.name || "Detail Lapangan"}</h3>
+                    <p className="text-slate-500 font-medium flex items-center gap-2 mb-6">
+                       📍 {previewCourt?.location || "Lokasi belum ditentukan"}
+                    </p>
+                    <p className="text-slate-600 leading-relaxed font-medium mb-8">
+                      {previewCourt?.description || "Nikmati bermain padel di lapangan premium dengan standar internasional. Dilengkapi dengan fasilitas terbaik, pencahayaan anti-silau, dan lingkungan yang asri."}
+                    </p>
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <span className="font-bold text-slate-500">Harga Per Jam</span>
+                      <span className="text-xl font-black text-blue-600">Rp {(previewCourt?.price || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
       )}
 
       <div className="max-w-5xl mx-auto px-4 md:px-6 space-y-12">
-        {/* Header */}
         <div>
           <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-2 tracking-tight">Booking</h1>
           <p className="text-slate-500 font-bold text-lg">Pilih lapangan, tentukan tanggal, lalu amankan jam mainmu.</p>
@@ -167,7 +176,8 @@ export default function BookingPage() {
                 <h2 className="text-xl font-bold text-slate-900">Pilih Lapangan</h2>
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
-                {MOCK_COURTS.map((court) => (
+                {courts.length === 0 && <p className="text-slate-400 font-bold col-span-3">Memuat lapangan...</p>}
+                {courts.map((court) => (
                   <div key={court.id} className="relative group">
                      {/* Preview Button */}
                      <button onClick={(e) => { e.stopPropagation(); setPreviewCourtInfo(court.id); }} className="absolute top-4 left-4 z-20 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity" title="Lihat Detail">
@@ -178,7 +188,7 @@ export default function BookingPage() {
                        isSelected={selectedCourt === court.id}
                        onSelect={() => { 
                          setSelectedCourt(court.id); 
-                         setSelectedSlots([]); // reset slots when court changes
+                         setSelectedSlots([]); 
                        }}
                      />
                   </div>
@@ -203,9 +213,9 @@ export default function BookingPage() {
                   return (
                     <button
                       key={idx}
-                      onClick={() => { setSelectedDate(dateNum); setSelectedSlots([]); }}
+                      onClick={() => { setSelectedDate(d); setSelectedSlots([]); }}
                       className={`flex-shrink-0 snap-start flex flex-col items-center justify-center w-[84px] h-[100px] rounded-3xl border-2 transition-all duration-200 active:scale-95 ${
-                        isSelected 
+                        selectedDate.toDateString() === d.toDateString() 
                           ? 'bg-slate-900 border-slate-900 text-white shadow-[0_10px_20px_-8px_rgba(0,0,0,0.5)] transform -translate-y-1' 
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:shadow-md hover:-translate-y-1'
                       }`}
@@ -238,9 +248,13 @@ export default function BookingPage() {
                 <div className="p-8 border-2 border-dashed border-slate-200 rounded-3xl text-center bg-white">
                   <p className="text-slate-500 font-bold">Pilih lapangan terlebih dahulu untuk melihat jadwal.</p>
                 </div>
+              ) : isLoadingSlots ? (
+                <div className="p-8 border-2 border-dashed border-slate-200 rounded-3xl text-center bg-white animate-pulse">
+                  <p className="text-slate-500 font-bold">Mengecek ketersediaan server realtime...</p>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {MOCK_TIME_SLOTS.map((slot, idx) => (
+                  {timeSlots.map((slot, idx) => (
                     <TimeSlot 
                       key={idx}
                       time={slot.time}
@@ -255,13 +269,11 @@ export default function BookingPage() {
             </div>
           </div>
           
-          {/* Sidebar Ringkasan (Sticky Desktop) */}
           <div className="hidden lg:block sticky top-24">
              <div className="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
                 <h3 className="font-black text-xl mb-6">Ringkasan Detail</h3>
                 
                 <div className="space-y-4 mb-6 relative">
-                  {/* Dekorasi garis vertikal progress */}
                   <div className="absolute left-[9px] top-4 bottom-4 w-0.5 bg-slate-100 -z-10 rounded-full"></div>
 
                   <div className="flex gap-4">
@@ -274,15 +286,15 @@ export default function BookingPage() {
                      </div>
                   </div>
 
-                  <div className="flex gap-4">
-                     <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 border-4 border-white shadow-sm ${isStep2Done ? 'bg-blue-500' : 'bg-slate-200'}`}></div>
-                     <div>
-                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tanggal</p>
-                       <p className={`font-bold ${isStep2Done ? 'text-slate-900' : 'text-slate-300'}`}>
-                         {selectedDate ? `${selectedDate} Bulan April` : "Belum dipilih"}
-                       </p>
-                     </div>
-                  </div>
+                   <div className="flex gap-4">
+                      <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 border-4 border-white shadow-sm ${isStep2Done ? 'bg-blue-500' : 'bg-slate-200'}`}></div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tanggal</p>
+                        <p className={`font-bold ${isStep2Done ? 'text-slate-900' : 'text-slate-300'}`}>
+                          {selectedDate ? `${selectedDate.getDate()} ${selectedDate.toLocaleDateString('id-ID', { month: 'long' })}` : "Belum dipilih"}
+                        </p>
+                      </div>
+                   </div>
 
                   <div className="flex gap-4">
                      <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 border-4 border-white shadow-sm ${isStep3Done ? 'bg-blue-500' : 'bg-slate-200'}`}></div>
@@ -338,7 +350,6 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {/* 4. Sticky Checkout Bar (Mobile Only) */}
       <div className={`lg:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 rounded-t-3xl p-5 px-4 shadow-[0_-15px_40px_-10px_rgba(0,0,0,0.15)] z-40 transform transition-transform duration-500 ${selectedSlots.length > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="w-full flex justify-between items-end">

@@ -1,18 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookingManager } from "@/components/admin/BookingManager";
 import { CourtManager } from "@/components/admin/CourtManager";
-import { MOCK_ADMIN_BOOKINGS } from "@/lib/adminData";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"bookings" | "courts">("bookings");
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const today = new Date();
-  const bookingsToday = MOCK_ADMIN_BOOKINGS.filter(b => b.createdAt.getDate() === today.getDate()).length;
-  const pendingCount = MOCK_ADMIN_BOOKINGS.filter(b => b.status === "pending" || b.status === "pending_verification").length;
-  const paidCount = MOCK_ADMIN_BOOKINGS.filter(b => b.status === "paid").length;
-  const expiredCount = MOCK_ADMIN_BOOKINGS.filter(b => b.status === "expired" || b.status === "rejected" || b.status === "cancelled").length;
+  useEffect(() => {
+    fetch('/api/bookings')
+      .then(res => res.json())
+      .then(data => {
+        if(Array.isArray(data)) setBookings(data);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const bookingsToday = bookings.filter(b => b.date.startsWith(todayStr)).length;
+  const pendingCount = bookings.filter(b => b.status === "PENDING").length;
+  const paidCount = bookings.filter(b => b.status === "CONFIRMED").length;
+  const expiredCount = bookings.filter(b => b.status === "CANCELLED").length;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
