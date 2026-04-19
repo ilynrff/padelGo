@@ -20,8 +20,12 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email }
         });
 
-        if (!user || user.password !== credentials.password) {
-          // If we had bcrypt: !await bcrypt.compare(credentials.password, user.password)
+        if (!user) {
+          throw new Error("Email atau password salah");
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) {
           throw new Error("Email atau password salah");
         }
 
@@ -40,15 +44,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role;
+        token.role = (user as { role?: string }).role;
         token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        (session.user as any).role = token.role;
-        (session.user as any).id = token.id;
+        session.user.role = token.role;
+        if (token.id) session.user.id = token.id;
       }
       return session;
     }

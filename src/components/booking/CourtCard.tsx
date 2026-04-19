@@ -1,8 +1,7 @@
 import React from 'react';
-import Image from 'next/image';
 
 interface CourtCardProps {
-  court: { id: string; name: string; location: string; price: number; image?: string; description?: string };
+  court: { id: string; name: string; location: string; pricePerHour: number; image?: string | null };
   isSelected: boolean;
   onSelect: () => void;
 }
@@ -21,12 +20,10 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
       <div className="h-40 w-full relative overflow-hidden bg-slate-200">
         <div className="absolute inset-0 transition-transform duration-500 hover:scale-110">
           {court.image ? (
-            <Image
+            <img
               src={court.image}
               alt={court.name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 33vw"
+              className="w-full h-full object-cover"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
@@ -55,7 +52,7 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
           {court.name}
         </h3>
         <p className="text-sm font-bold text-slate-500">
-          Rp {court.price.toLocaleString('id-ID')} <span className="text-slate-400 font-medium">/ jam</span>
+          Rp {court.pricePerHour.toLocaleString('id-ID')} <span className="text-slate-400 font-medium">/ jam</span>
         </p>
       </div>
     </div>

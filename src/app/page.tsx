@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import { fetchJson } from "@/lib/fetchJson";
 
 const FEATURES = [
   {
@@ -41,27 +41,22 @@ const FEATURES = [
 ];
 
 export default function Home() {
-  const [courts, setCourts] = useState<any[]>([]);
+  const [courts, setCourts] = useState<
+    { id: string; name: string; location: string; pricePerHour: number; image?: string | null }[]
+  >([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch('/api/courts')
-      .then(res => res.json())
-      .then(data => {
-        if(Array.isArray(data) && data.length > 0) {
-          setCourts(data);
-        } else {
-          throw new Error("EMPTY_DB");
-        }
+    fetchJson<{ id: string; name: string; location: string; pricePerHour: number; image?: string | null }[]>("/api/courts")
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error("Invalid response");
+        setCourts(data);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Error fetching courts Home:", err);
-        // Fallback data for Home
-        setCourts([
-          { id: "court-1", name: "Padel Court A (Premium)", location: "Banyumanik, Semarang", type: "Indoor", price: 150000, description: "Lapangan panoramic glass dengan standar WPT, dilengkapi LED anti-silau.", image: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&q=80&w=800" },
-          { id: "court-2", name: "Indoor Panoramic Court", location: "Tembalang, Semarang", type: "Indoor", price: 200000, description: "Full enclosed panoramic court, cocok untuk latihan intensif malam hari.", image: "https://images.unsplash.com/photo-1622325055171-897b9ee9059e?auto=format&fit=crop&q=80&w=800" },
-          { id: "court-3", name: "Outdoor Classic Court", location: "Simpang Lima, Semarang", type: "Outdoor", price: 120000, description: "Lapangan outdoor dengan rumput sintetis premium dan sirkulasi udara alami.", image: "https://images.unsplash.com/photo-1592919016382-7718e268923a?auto=format&fit=crop&q=80&w=800" },
-        ]);
+        setCourts([]);
+        setError("Gagal memuat data lapangan. Pastikan backend & database sudah siap.");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -129,6 +124,11 @@ export default function Home() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
+            {error && (
+              <div className="col-span-full p-4 bg-red-50 border border-red-200 rounded-2xl text-sm font-bold text-red-700">
+                {error}
+              </div>
+            )}
             {loading ? (
               Array.from({length: 3}).map((_, i) => (
                 <div key={i} className="h-96 rounded-[2rem] bg-slate-100 animate-pulse border border-slate-100"></div>
@@ -137,17 +137,12 @@ export default function Home() {
               courts.map((court) => (
                 <div key={court.id} className="group flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
                   <div className="h-52 w-full relative overflow-hidden">
-                    <Image 
+                    <img 
                       src={court.image || "/images/court-1.jpg"} 
                       alt={court.name} 
-                      fill 
-                      className="object-cover transition-transform duration-500 group-hover:scale-110" 
-                      sizes="(max-width: 768px) 100vw, 33vw" 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-slate-700">
-                      {court.type || "Indoor"}
-                    </div>
                     <div className="absolute bottom-4 left-4 text-white text-xs font-bold bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg">
                       {court.location}
                     </div>
@@ -157,11 +152,12 @@ export default function Home() {
                       {court.name}
                     </h3>
                     <p className="text-slate-500 font-medium text-sm mb-6 flex-1 leading-relaxed">
-                      {court.description || "Lapangan panoramic glass dengan standar WPT, dilengkapi LED anti-silau."}
+                      Booking lapangan ini langsung dari aplikasi.
                     </p>
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100">
                       <span className="text-lg font-extrabold text-slate-900">
-                        Rp {(court.price / 1000)}k <span className="text-sm text-slate-400 font-medium">/ jam</span>
+                        Rp {Number(court.pricePerHour || 0).toLocaleString('id-ID')}{" "}
+                        <span className="text-sm text-slate-400 font-medium">/ jam</span>
                       </span>
                       <Link href={`/booking?courtId=${court.id}`}>
                         <Button size="sm" variant="secondary">Cek Jadwal</Button>

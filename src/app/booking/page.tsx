@@ -33,7 +33,7 @@ export default function BookingPage() {
   const [previewCourtInfo, setPreviewCourtInfo] = useState<string | null>(null);
 
   const selectedCourtData = courts.find(c => c.id === selectedCourt);
-  const courtPrice = selectedCourtData?.price || 0;
+  const courtPrice = selectedCourtData?.pricePerHour || 0;
   const totalPrice = courtPrice * selectedSlots.length;
 
   const isStep1Done = !!selectedCourt;

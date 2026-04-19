@@ -1,12 +1,22 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "library"
-  binaryTargets = ["native", "windows"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
 }
 
 model User {
@@ -14,34 +24,52 @@ model User {
   name      String
   email     String    @unique
   password  String
-  role      String    @default("USER") // Using string default pattern for SQLite simple integration instead of Enum which wasn't supported robustly historically without extra generator configs
+  role      String    @default("USER")
   bookings  Booking[]
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Court {
   id          String    @id @default(uuid())
   name        String
   location    String
-  price       Float
-  description String?
-  isActive    Boolean   @default(true)
+  pricePerHour Int
+  image       String?
   bookings    Booking[]
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Booking {
-  id            String        @id @default(uuid())
-  userId        String
-  courtId       String
-  date          DateTime      
-  timeSlot      String        // e.g., '10:00-11:00'
-  status        String        @default("PENDING")
-  paymentStatus String        @default("UNPAID")
-  user          User          @relation(fields: [userId], references: [id])
-  court         Court         @relation(fields: [courtId], references: [id])
-  createdAt     DateTime      @default(now())
+  id         String        @id @default(uuid())
+  userId     String
+  courtId    String
+  date       DateTime
+  startTime  Int
+  endTime    Int
+  status     BookingStatus @default(PENDING)
+  totalPrice Int
 
-  // Prevent double booking on same court
-  @@unique([courtId, date, timeSlot]) 
+  user    User  @relation(fields: [userId], references: [id])
+  court   Court @relation(fields: [courtId], references: [id])
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courtId, date])
+  @@index([userId])
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  bookingId String        @unique
+  proofImage String
+  status    PaymentStatus @default(PENDING)
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

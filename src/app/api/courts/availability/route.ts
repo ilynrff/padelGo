@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import {
+  buildDailySlotLabels,
+  coerceDateOnlyUTC,
+  rangesOverlap,
+} from "@/lib/bookingTime";
+import { getErrorMessage } from "@/lib/errorMessage";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -11,35 +20,38 @@ export async function GET(req: Request) {
   }
 
   try {
-    const queryDate = new Date(dateStr);
-    
-    // Ambil data booking yang sudah fix / overlap
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        courtId: courtId,
-        date: queryDate,
-        status: { in: ["PENDING", "CONFIRMED"] }
-      },
-      select: { timeSlot: true }
+    const queryDate = coerceDateOnlyUTC(dateStr);
+    if (!queryDate) {
+      return NextResponse.json({ error: "Invalid date. Use YYYY-MM-DD." }, { status: 400 });
+    }
+
+    // Auto-expire old pending bookings to free up slots
+    const expirationCutoff = new Date(Date.now() - 15 * 60 * 1000);
+    await prisma.booking.updateMany({
+      where: { status: "PENDING", createdAt: { lt: expirationCutoff } },
+      data: { status: "EXPIRED" },
     });
 
-    const bookedSlots = existingBookings.map(b => b.timeSlot);
+    const existingBookings = await prisma.booking.findMany({
+      where: {
+        courtId,
+        date: queryDate,
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      select: { startTime: true, endTime: true },
+    });
 
-    // Bikin slot default (e.g., 08:00 - 20:00)
-    const allSlots = [
-      "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
-      "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
-      "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00"
-    ];
-
-    const availability = allSlots.map(time => ({
-       time,
-       available: !bookedSlots.includes(time)
+    const slots = buildDailySlotLabels();
+    const availability = slots.map((s) => ({
+      time: s.label,
+      available: !existingBookings.some((b) =>
+        rangesOverlap({ start: b.startTime, end: b.endTime }, { start: s.start, end: s.end }),
+      ),
     }));
 
     return NextResponse.json(availability, { status: 200 });
-
-  } catch (err) {
-    return NextResponse.json({ error: "Database query failed" }, { status: 500 });
+  } catch (err: unknown) {
+    console.error("API Error [GET /api/courts/availability]:", err);
+    return NextResponse.json({ error: "Database query failed", details: getErrorMessage(err) }, { status: 500 });
   }
 }

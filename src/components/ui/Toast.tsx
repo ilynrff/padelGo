@@ -1,6 +1,12 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 export function Toast({ isOpen, message, type = 'success', onClose }: { isOpen: boolean, message: string, type?: 'success'|'error', onClose: () => void }) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const t = setTimeout(() => onClose(), 3000);
+    return () => clearTimeout(t);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const bg = type === 'success' ? 'bg-emerald-500' : 'bg-red-500';
