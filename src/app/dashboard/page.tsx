@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -24,13 +25,11 @@ type Booking = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  const [proofByBookingId, setProofByBookingId] = useState<
-    Record<string, string>
-  >({});
+  // Note: proofByBookingId and setProofByBookingId were unused
   const [fileByBookingId, setFileByBookingId] = useState<
     Record<string, File | null>
   >({});
@@ -43,6 +42,13 @@ export default function DashboardPage() {
   } | null>(null);
 
   const canFetch = status === "authenticated";
+
+  // Redirect ADMIN to /admin
+  useEffect(() => {
+    if (session?.user?.role === "ADMIN") {
+      router.replace("/admin");
+    }
+  }, [session?.user?.role, router]);
 
   const refresh = async () => {
     setIsLoading(true);
@@ -266,8 +272,8 @@ export default function DashboardPage() {
                         }));
                       }}
                     />
-                    <Button 
-                      onClick={() => submitProof(b.id)} 
+                    <Button
+                      onClick={() => submitProof(b.id)}
                       isLoading={uploadingBookingId === b.id}
                       disabled={!fileByBookingId[b.id]}
                     >
@@ -276,9 +282,11 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {(b.status === "PERLU_VERIFIKASI" || b.payment?.status === "PENDING") && (
+                {(b.status === "PERLU_VERIFIKASI" ||
+                  b.payment?.status === "PENDING") && (
                   <div className="mt-4 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                    Bukti pembayaran sudah dikirim (Verifikasi: {b.status}). Menunggu verifikasi admin.
+                    Bukti pembayaran sudah dikirim (Verifikasi: {b.status}).
+                    Menunggu verifikasi admin.
                   </div>
                 )}
 

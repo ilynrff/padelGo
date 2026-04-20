@@ -9,7 +9,11 @@ import Link from "next/link";
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "ADMIN") {
     redirect("/");
   }
 
@@ -18,22 +22,25 @@ export default async function AdminPage() {
     include: {
       user: { select: { name: true, email: true } },
       court: { select: { name: true } },
-      payment: true
+      payment: true,
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
   });
 
   // Convert dates to strings for client components
-  const serializedBookings = bookings.map(b => ({
+  const serializedBookings = bookings.map((b) => ({
     ...b,
     date: b.date.toISOString(),
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
-    payment: b.payment ? {
-      ...b.payment,
-      createdAt: b.payment.createdAt.toISOString(),
-      updatedAt: b.payment.updatedAt.toISOString(),
-    } : null
+    payment: b.payment
+      ? {
+          ...b.payment,
+          createdAt: b.payment.createdAt.toISOString(),
+          updatedAt: b.payment.updatedAt.toISOString(),
+        }
+      : null,
+    paymentProofUrl: b.paymentProofUrl || undefined,
   }));
 
   return (
@@ -41,8 +48,12 @@ export default async function AdminPage() {
       <div className="max-w-7xl mx-auto w-full space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Admin Dashboard</h1>
-            <p className="text-slate-500 font-medium">Selamat datang, {session.user.name}</p>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+              Admin Dashboard
+            </h1>
+            <p className="text-slate-500 font-medium">
+              Selamat datang, {session.user.name}
+            </p>
           </div>
           <Link href="/">
             <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors">
@@ -53,12 +64,16 @@ export default async function AdminPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
-             <h2 className="text-2xl font-black text-slate-800 px-2">Daftar Reservasi</h2>
-             <BookingManager initialBookings={serializedBookings as any} />
+            <h2 className="text-2xl font-black text-slate-800 px-2">
+              Daftar Reservasi
+            </h2>
+            <BookingManager initialBookings={serializedBookings} />
           </div>
           <div className="space-y-6">
-             <h2 className="text-2xl font-black text-slate-800 px-2">Pengaturan Lapangan</h2>
-             <CourtManager />
+            <h2 className="text-2xl font-black text-slate-800 px-2">
+              Pengaturan Lapangan
+            </h2>
+            <CourtManager />
           </div>
         </div>
       </div>

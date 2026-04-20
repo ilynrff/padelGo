@@ -37,9 +37,10 @@ export default function RegisterPage() {
         throw new Error(data.error || "Gagal mendaftar.");
       }
 
-      router.push("/login?callbackUrl=/dashboard&registered=true");
-    } catch (err: any) {
-      setError(err.message);
+      router.push("/login?registered=true");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +51,15 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md p-8 md:p-10 rounded-[2rem] shadow-xl">
         <div className="text-center mb-10">
           <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="8.5" cy="7" r="4"></circle>
               <line x1="20" y1="8" x2="20" y2="14"></line>
@@ -58,7 +67,9 @@ export default function RegisterPage() {
             </svg>
           </div>
           <h1 className="text-3xl font-black text-slate-900 mb-2">Buat Akun</h1>
-          <p className="text-slate-500 font-medium">Daftar sekarang untuk mulai bermain.</p>
+          <p className="text-slate-500 font-medium">
+            Daftar sekarang untuk mulai bermain.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -89,14 +100,22 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <Button type="submit" size="full" className="mt-2" isLoading={isLoading}>
+          <Button
+            type="submit"
+            size="full"
+            className="mt-2"
+            isLoading={isLoading}
+          >
             Sign Up
           </Button>
         </form>
 
         <div className="text-center mt-8 text-sm font-medium text-slate-500">
           Sudah punya akun?{" "}
-          <Link href="/login" className="text-blue-600 font-bold hover:underline">
+          <Link
+            href="/login"
+            className="text-blue-600 font-bold hover:underline"
+          >
             Login di sini
           </Link>
         </div>

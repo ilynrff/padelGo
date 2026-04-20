@@ -35,11 +35,12 @@ export async function GET() {
       password: password,
       note: "Silakan login menggunakan kredensial di atas."
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("DEBUG SETUP ADMIN ERROR:", error);
     return NextResponse.json({ 
       error: "Gagal membuat admin default", 
-      details: error.message || String(error),
+      details: errorMessage,
       suggestion: "Pastikan database PostgreSQL sudah menyala dan DATABASE_URL di .env sudah benar."
     }, { status: 500 });
   }

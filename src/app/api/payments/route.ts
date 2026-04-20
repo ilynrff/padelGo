@@ -18,6 +18,12 @@ export async function POST(req: Request) {
     const userRole = session.user.role;
     const userId = session.user.id;
 
+    // Admin tidak boleh upload payment proof
+    if (userRole === "ADMIN") {
+      console.warn(`API: Admin ${userId} attempted to upload payment proof.`);
+      return NextResponse.json({ error: "Admin tidak dapat mengupload bukti pembayaran" }, { status: 403 });
+    }
+
     const body: unknown = await req.json();
     const payload = (body ?? {}) as Record<string, unknown>;
     const bookingId = payload.bookingId;

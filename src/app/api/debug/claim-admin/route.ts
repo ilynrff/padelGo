@@ -29,7 +29,8 @@ export async function GET() {
         </body>
       </html>
     `, { headers: { "Content-Type": "text/html" } });
-  } catch (error) {
+  } catch (_error: unknown) {
+    console.error("Error updating role:", _error);
     return NextResponse.json({ error: "Gagal mengupdate role" }, { status: 500 });
   }
 }

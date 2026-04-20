@@ -11,14 +11,19 @@ export default function Navbar() {
 
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated";
-  const isAdmin = session?.user.role === "ADMIN";
+  const isAdmin = session?.user?.role === "ADMIN";
 
-  const links = [
-    { name: "Home", path: "/" },
-    { name: "Booking", path: "/booking" },
-    { name: "Dashboard", path: "/dashboard" },
-    ...(isAdmin ? [{ name: "Admin", path: "/admin" }] : []),
-  ];
+  // Menu berbeda untuk USER dan ADMIN
+  const links = isAdmin
+    ? [
+        { name: "Home", path: "/" },
+        { name: "Admin", path: "/admin" },
+      ]
+    : [
+        { name: "Home", path: "/" },
+        ...(isLoggedIn ? [{ name: "Booking", path: "/booking" }] : []),
+        ...(isLoggedIn ? [{ name: "Dashboard", path: "/dashboard" }] : []),
+      ];
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-xl">
@@ -26,7 +31,10 @@ export default function Navbar() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2 group">
             <span className="font-extrabold text-2xl tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
-              Padel<span className="text-blue-600 group-hover:text-slate-900 transition-colors">Go</span>
+              Padel
+              <span className="text-blue-600 group-hover:text-slate-900 transition-colors">
+                Go
+              </span>
             </span>
           </Link>
 
@@ -77,11 +85,27 @@ export default function Navbar() {
           onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <path d="M18 6L6 18M6 6l12 12"></path>
             </svg>
           ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <path d="M4 6h16M4 12h16M4 18h16"></path>
             </svg>
           )}
@@ -116,10 +140,18 @@ export default function Navbar() {
               </button>
             ) : (
               <>
-                <Link href="/login" className="block text-base font-bold text-slate-600 py-2 px-4" onClick={() => setIsOpen(false)}>
+                <Link
+                  href="/login"
+                  className="block text-base font-bold text-slate-600 py-2 px-4"
+                  onClick={() => setIsOpen(false)}
+                >
                   Log in
                 </Link>
-                <Link href="/register" className="block text-base font-bold text-blue-600 py-2 px-4" onClick={() => setIsOpen(false)}>
+                <Link
+                  href="/register"
+                  className="block text-base font-bold text-blue-600 py-2 px-4"
+                  onClick={() => setIsOpen(false)}
+                >
                   Sign up free →
                 </Link>
               </>

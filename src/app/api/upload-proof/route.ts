@@ -13,14 +13,43 @@ const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
 export async function POST(req: Request) {
   console.log("DEBUG: POST /api/upload-proof called");
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      console.warn("DEBUG: Unauthorized upload proof attempt.");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Admin tidak boleh upload proof
+    if (session.user.role === "ADMIN") {
+      console.warn("DEBUG: Admin attempted to upload proof.");
+      return NextResponse.json({ error: "Admin tidak dapat mengupload bukti pembayaran" }, { status: 403 });
+    }
+
+    const userId = session.user.id;
     const formData = await req.formData();
     const file = formData.get("file") as Blob | null;
     const bookingId = formData.get("bookingId") as string | null;
 
-    console.log(`DEBUG: Processing upload for Booking ID: ${bookingId}`);
+    console.log(`DEBUG: Processing upload for Booking ID: ${bookingId} by user ${userId}`);
 
     if (!file || !bookingId) {
       return NextResponse.json({ error: "Missing file or bookingId" }, { status: 400 });
+    }
+
+    // Verify booking belongs to user
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true, status: true }
+    });
+
+    if (!booking) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    if (booking.userId !== userId) {
+      console.warn(`DEBUG: User ${userId} attempted to upload proof for booking of user ${booking.userId}`);
+      return NextResponse.json({ error: "Forbidden - Booking milik user lain" }, { status: 403 });
     }
 
     // 1. Write file to disk
@@ -33,7 +62,7 @@ export async function POST(req: Request) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      const originalName = (file as any).name || "proof.jpg";
+      const originalName = (file as File).name || "proof.jpg";
       const timestamp = Date.now();
       const fileName = `${timestamp}-${originalName.replace(/\s+/g, "_")}`;
       const filePath = join(UPLOAD_DIR, fileName);
@@ -41,9 +70,10 @@ export async function POST(req: Request) {
       await writeFile(filePath, buffer);
       fileUrl = `/uploads/${fileName}`;
       console.log(`DEBUG: File written to ${filePath}`);
-    } catch (fsError: any) {
+    } catch (fsError: unknown) {
+      const errorMessage = fsError instanceof Error ? fsError.message : String(fsError);
       console.error("DEBUG: File System Error:", fsError);
-      return NextResponse.json({ error: "Gagal menyimpan file ke disk", details: fsError.message }, { status: 500 });
+      return NextResponse.json({ error: "Gagal menyimpan file ke disk", details: errorMessage }, { status: 500 });
     }
 
     // 2. Update database - Save to Payment table and update Booking status
@@ -80,9 +110,10 @@ export async function POST(req: Request) {
         }
       });
       console.log(`DEBUG: Database updated for booking ${bookingId}`);
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
       console.error("DEBUG: Database Error:", dbError);
-      return NextResponse.json({ error: "Gagal update status di database", details: dbError.message }, { status: 500 });
+      return NextResponse.json({ error: "Gagal update status di database", details: errorMessage }, { status: 500 });
     }
 
     return NextResponse.json({

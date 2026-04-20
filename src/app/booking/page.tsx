@@ -6,9 +6,14 @@ import { Toast } from "@/components/ui/Toast";
 import { CourtCard } from "@/components/booking/CourtCard";
 import { TimeSlot } from "@/components/booking/TimeSlot";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 import Image from "next/image";
 
 export default function BookingPage() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const {
     courts,
     timeSlots,
@@ -31,6 +36,31 @@ export default function BookingPage() {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [previewCourtInfo, setPreviewCourtInfo] = useState<string | null>(null);
+
+  // Admin tidak boleh booking
+  if (isAdmin) {
+    return (
+      <div className="flex-1 bg-slate-50 relative pb-40 pt-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl border border-red-200 p-8 text-center">
+            <div className="text-5xl mb-4">🚫</div>
+            <h1 className="text-3xl font-black text-slate-900 mb-3">
+              Akses Ditolak
+            </h1>
+            <p className="text-slate-600 font-medium mb-6">
+              Admin tidak dapat melakukan booking. Silahkan gunakan akun regular
+              untuk booking.
+            </p>
+            <Link href="/admin">
+              <button className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors">
+                Kembali ke Admin Dashboard
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const selectedCourtData = courts.find((c) => c.id === selectedCourt);
   const courtPrice = selectedCourtData?.pricePerHour || 0;
@@ -305,7 +335,8 @@ export default function BookingPage() {
                     weekday: "short",
                   });
                   const dateNum = d.getDate();
-                  const isSelected = selectedDate === dateNum;
+                  const isSelected =
+                    selectedDate?.toDateString() === d.toDateString();
 
                   return (
                     <button

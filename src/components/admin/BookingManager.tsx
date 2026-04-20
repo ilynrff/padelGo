@@ -28,26 +28,70 @@ type Props = {
 
 function AdminBadge({ status }: { status: string }) {
   const s = String(status).toUpperCase();
-  if (s === "PENDING") return <span className="bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded text-xs uppercase">Pending</span>;
-  if (s === "PERLU_VERIFIKASI") return <span className="bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded text-xs uppercase">Verification</span>;
-  if (s === "CONFIRMED") return <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase">Confirmed</span>;
-  if (s === "CANCELLED") return <span className="bg-red-100 text-red-700 font-bold px-2 py-1 rounded text-xs uppercase">Cancelled</span>;
-  if (s === "EXPIRED") return <span className="bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">Expired</span>;
-  return <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">{s}</span>;
+  if (s === "PENDING")
+    return (
+      <span className="bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded text-xs uppercase">
+        Pending
+      </span>
+    );
+  if (s === "PERLU_VERIFIKASI")
+    return (
+      <span className="bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded text-xs uppercase">
+        Verification
+      </span>
+    );
+  if (s === "CONFIRMED")
+    return (
+      <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase">
+        Confirmed
+      </span>
+    );
+  if (s === "CANCELLED")
+    return (
+      <span className="bg-red-100 text-red-700 font-bold px-2 py-1 rounded text-xs uppercase">
+        Cancelled
+      </span>
+    );
+  if (s === "EXPIRED")
+    return (
+      <span className="bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">
+        Expired
+      </span>
+    );
+  return (
+    <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">
+      {s}
+    </span>
+  );
 }
 
-export function BookingManager({ initialBookings = [], isLoading = false }: Props) {
+export function BookingManager({
+  initialBookings = [],
+  isLoading = false,
+}: Props) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [filter, setFilter] = useState<"all" | "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED">("all");
+  const [filter, setFilter] = useState<
+    | "all"
+    | "PENDING"
+    | "PERLU_VERIFIKASI"
+    | "CONFIRMED"
+    | "CANCELLED"
+    | "EXPIRED"
+  >("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
 
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [confirmModal, setConfirmModal] = useState<{ type: "Approve" | "Reject" | "Expire"; bookingId: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "Approve" | "Reject" | "Expire" | "ApprovePayment" | "RejectPayment";
+    bookingId: string;
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [toastQueue, setToastQueue] = useState<{ msg: string; type: "success" | "error" }[]>([]);
+  const [toastQueue, setToastQueue] = useState<
+    { msg: string; type: "success" | "error" }[]
+  >([]);
 
   useEffect(() => {
     setBookings(initialBookings);
@@ -74,18 +118,53 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
     if (!confirmModal) return;
     setIsProcessing(true);
 
-    const newStatus =
-      confirmModal.type === "Approve" ? "CONFIRMED" : confirmModal.type === "Reject" ? "CANCELLED" : "EXPIRED";
-
     try {
-      const data = await fetchJson<Booking>(`/api/bookings/${confirmModal.bookingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      // Handle payment verification
+      if (
+        confirmModal.type === "ApprovePayment" ||
+        confirmModal.type === "RejectPayment"
+      ) {
+        const action =
+          confirmModal.type === "ApprovePayment" ? "APPROVE" : "REJECT";
+        const data = await fetchJson<{ booking: Booking }>(
+          `/api/admin/verify-payment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingId: confirmModal.bookingId, action }),
+          },
+        );
 
-      setBookings((prev) => prev.map((b) => (b.id === confirmModal.bookingId ? data : b)));
-      showToast(`Booking berhasil di-update ke ${newStatus}`, "success");
+        setBookings((prev) =>
+          prev.map((b) => (b.id === confirmModal.bookingId ? data.booking : b)),
+        );
+        showToast(
+          `Pembayaran berhasil di-${action === "APPROVE" ? "approve" : "reject"}`,
+          "success",
+        );
+      } else {
+        // Handle booking status update
+        const newStatus =
+          confirmModal.type === "Approve"
+            ? "CONFIRMED"
+            : confirmModal.type === "Reject"
+              ? "CANCELLED"
+              : "EXPIRED";
+
+        const data = await fetchJson<Booking>(
+          `/api/bookings/${confirmModal.bookingId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+          },
+        );
+
+        setBookings((prev) =>
+          prev.map((b) => (b.id === confirmModal.bookingId ? data : b)),
+        );
+        showToast(`Booking berhasil di-update ke ${newStatus}`, "success");
+      }
     } catch (err: unknown) {
       console.error(err);
       showToast(getErrorMessage(err) || "Terjadi kesalahan", "error");
@@ -98,7 +177,8 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
 
   const filtered = useMemo(() => {
     let list = bookings.slice();
-    if (filter !== "all") list = list.filter((b) => String(b.status).toUpperCase() === filter);
+    if (filter !== "all")
+      list = list.filter((b) => String(b.status).toUpperCase() === filter);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((b) => {
@@ -120,7 +200,13 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
     <div className="space-y-6">
       <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
         {toastQueue.map((t, idx) => (
-          <Toast key={idx} isOpen={true} message={t.msg} type={t.type} onClose={() => {}} />
+          <Toast
+            key={idx}
+            isOpen={true}
+            message={t.msg}
+            type={t.type}
+            onClose={() => {}}
+          />
         ))}
       </div>
 
@@ -138,8 +224,23 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
             value={filter}
             onChange={(e) => {
               const v = e.target.value;
-              if (v === "all" || v === "PENDING" || v === "CONFIRMED" || v === "CANCELLED" || v === "EXPIRED" || v === "PERLU_VERIFIKASI") {
-                setFilter(v as any);
+              if (
+                v === "all" ||
+                v === "PENDING" ||
+                v === "CONFIRMED" ||
+                v === "CANCELLED" ||
+                v === "EXPIRED" ||
+                v === "PERLU_VERIFIKASI"
+              ) {
+                setFilter(
+                  v as
+                    | "all"
+                    | "PENDING"
+                    | "PERLU_VERIFIKASI"
+                    | "CONFIRMED"
+                    | "CANCELLED"
+                    | "EXPIRED",
+                );
               }
             }}
           >
@@ -172,26 +273,56 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">ID</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">User</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">Court</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">Waktu</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">Total</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">Payment</th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">Status</th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  ID
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  User
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  Court
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  Waktu
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  Total
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  Payment
+                </th>
+                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
               {(isLoading ? [] : filtered).map((b) => (
-                <tr key={b.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => setSelected(b)}>
-                  <td className="p-4 font-black text-slate-900">{String(b.id).slice(0, 8)}</td>
-                  <td className="p-4 font-bold text-slate-700">{b.user?.name || "-"}</td>
-                  <td className="p-4 font-bold text-slate-700">{b.court?.name || "-"}</td>
-                  <td className="p-4 font-bold text-slate-700">
-                    {String(b.date).slice(0, 10)} • {formatMinutesToHHmm(b.startTime)}-{formatMinutesToHHmm(b.endTime)}
+                <tr
+                  key={b.id}
+                  className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setSelected(b)}
+                >
+                  <td className="p-4 font-black text-slate-900">
+                    {String(b.id).slice(0, 8)}
                   </td>
-                  <td className="p-4 font-black text-blue-700">Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}</td>
-                  <td className="p-4 font-bold text-slate-700">{b.payment?.status || "NOT_SUBMITTED"}</td>
+                  <td className="p-4 font-bold text-slate-700">
+                    {b.user?.name || "-"}
+                  </td>
+                  <td className="p-4 font-bold text-slate-700">
+                    {b.court?.name || "-"}
+                  </td>
+                  <td className="p-4 font-bold text-slate-700">
+                    {String(b.date).slice(0, 10)} •{" "}
+                    {formatMinutesToHHmm(b.startTime)}-
+                    {formatMinutesToHHmm(b.endTime)}
+                  </td>
+                  <td className="p-4 font-black text-blue-700">
+                    Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}
+                  </td>
+                  <td className="p-4 font-bold text-slate-700">
+                    {b.payment?.status || "NOT_SUBMITTED"}
+                  </td>
                   <td className="p-4">
                     <AdminBadge status={b.status} />
                   </td>
@@ -217,14 +348,27 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-3xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-3xl p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-start gap-4 mb-6">
               <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Booking</p>
-                <h3 className="text-2xl font-black text-slate-900">{selected.id}</h3>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  Booking
+                </p>
+                <h3 className="text-2xl font-black text-slate-900">
+                  {selected.id}
+                </h3>
               </div>
-              <button onClick={() => setSelected(null)} className="w-10 h-10 rounded-full bg-slate-200 text-slate-500 font-bold">
+              <button
+                onClick={() => setSelected(null)}
+                className="w-10 h-10 rounded-full bg-slate-200 text-slate-500 font-bold"
+              >
                 X
               </button>
             </div>
@@ -232,22 +376,39 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">User</p>
-                  <p className="font-bold text-slate-900">{selected.user?.name || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Court</p>
-                  <p className="font-bold text-slate-900">{selected.court?.name || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Waktu</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    User
+                  </p>
                   <p className="font-bold text-slate-900">
-                    {String(selected.date).slice(0, 10)} • {formatMinutesToHHmm(selected.startTime)} - {formatMinutesToHHmm(selected.endTime)}
+                    {selected.user?.name || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total</p>
-                  <p className="font-black text-blue-600 text-xl">Rp {Number(selected.totalPrice || 0).toLocaleString("id-ID")}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Court
+                  </p>
+                  <p className="font-bold text-slate-900">
+                    {selected.court?.name || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Waktu
+                  </p>
+                  <p className="font-bold text-slate-900">
+                    {String(selected.date).slice(0, 10)} •{" "}
+                    {formatMinutesToHHmm(selected.startTime)} -{" "}
+                    {formatMinutesToHHmm(selected.endTime)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Total
+                  </p>
+                  <p className="font-black text-blue-600 text-xl">
+                    Rp{" "}
+                    {Number(selected.totalPrice || 0).toLocaleString("id-ID")}
+                  </p>
                 </div>
                 <div className="pt-2">
                   <AdminBadge status={selected.status} />
@@ -258,7 +419,12 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
                     <Button
                       size="full"
                       className="bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => setConfirmModal({ type: "Approve", bookingId: selected.id })}
+                      onClick={() =>
+                        setConfirmModal({
+                          type: "Approve",
+                          bookingId: selected.id,
+                        })
+                      }
                     >
                       Approve
                     </Button>
@@ -266,7 +432,12 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
                       size="full"
                       variant="outline"
                       className="text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={() => setConfirmModal({ type: "Reject", bookingId: selected.id })}
+                      onClick={() =>
+                        setConfirmModal({
+                          type: "Reject",
+                          bookingId: selected.id,
+                        })
+                      }
                     >
                       Reject
                     </Button>
@@ -274,7 +445,12 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
                       size="full"
                       variant="outline"
                       className="text-slate-600 border-slate-200 hover:bg-slate-50"
-                      onClick={() => setConfirmModal({ type: "Expire", bookingId: selected.id })}
+                      onClick={() =>
+                        setConfirmModal({
+                          type: "Expire",
+                          bookingId: selected.id,
+                        })
+                      }
                     >
                       Expire
                     </Button>
@@ -283,10 +459,18 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
               </div>
 
               <div className="bg-slate-50 rounded-3xl p-5 border border-slate-100 flex flex-col">
-                <p className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Bukti Pembayaran</p>
+                <p className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">
+                  Bukti Pembayaran
+                </p>
                 {selected.paymentProofUrl || selected.payment?.proofImage ? (
                   <div className="w-full h-72 bg-white rounded-2xl overflow-hidden border border-slate-200">
-                    <img src={selected.paymentProofUrl || selected.payment?.proofImage} className="w-full h-full object-contain" alt="Proof" />
+                    <img
+                      src={
+                        selected.paymentProofUrl || selected.payment?.proofImage
+                      }
+                      className="w-full h-full object-contain"
+                      alt="Proof"
+                    />
                   </div>
                 ) : (
                   <div className="w-full h-72 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center flex-col text-slate-400">
@@ -294,8 +478,42 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
                   </div>
                 )}
                 <div className="mt-4 text-xs font-bold text-slate-500">
-                  Payment status: {selected.payment?.status || (selected.paymentProofUrl ? "SUBMITTED" : "NOT_SUBMITTED")}
+                  Payment status:{" "}
+                  {selected.payment?.status ||
+                    (selected.paymentProofUrl ? "SUBMITTED" : "NOT_SUBMITTED")}
                 </div>
+
+                {/* Tombol verifikasi pembayaran untuk status PERLU_VERIFIKASI */}
+                {String(selected.status).toUpperCase() === "PERLU_VERIFIKASI" &&
+                  selected.payment && (
+                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+                      <Button
+                        size="full"
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() =>
+                          setConfirmModal({
+                            type: "ApprovePayment",
+                            bookingId: selected.id,
+                          })
+                        }
+                      >
+                        ✓ Approve Payment
+                      </Button>
+                      <Button
+                        size="full"
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() =>
+                          setConfirmModal({
+                            type: "RejectPayment",
+                            bookingId: selected.id,
+                          })
+                        }
+                      >
+                        ✗ Reject Payment
+                      </Button>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -303,17 +521,42 @@ export function BookingManager({ initialBookings = [], isLoading = false }: Prop
       )}
 
       {confirmModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => !isProcessing && setConfirmModal(null)}>
-          <div className="bg-white p-6 rounded-3xl max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-slate-900 mb-2">Konfirmasi {confirmModal.type}</h3>
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => !isProcessing && setConfirmModal(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-3xl max-w-sm w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-black text-slate-900 mb-2">
+              {confirmModal.type === "ApprovePayment"
+                ? "Approve Pembayaran"
+                : confirmModal.type === "RejectPayment"
+                  ? "Reject Pembayaran"
+                  : `Konfirmasi ${confirmModal.type}`}
+            </h3>
             <p className="text-slate-500 text-sm font-medium mb-6">
-              Yakin ingin {confirmModal.type.toLowerCase()} booking ini?
+              {confirmModal.type === "ApprovePayment"
+                ? "Pembayaran akan dikonfirmasi dan booking akan langsung CONFIRMED."
+                : confirmModal.type === "RejectPayment"
+                  ? "Pembayaran akan ditolak dan booking akan CANCELLED."
+                  : `Yakin ingin ${confirmModal.type.toLowerCase()} booking ini?`}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" className="w-full" disabled={isProcessing} onClick={() => setConfirmModal(null)}>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={isProcessing}
+                onClick={() => setConfirmModal(null)}
+              >
                 Batal
               </Button>
-              <Button className="w-full" isLoading={isProcessing} onClick={handleAction}>
+              <Button
+                className="w-full"
+                isLoading={isProcessing}
+                onClick={handleAction}
+              >
                 Ya
               </Button>
             </div>

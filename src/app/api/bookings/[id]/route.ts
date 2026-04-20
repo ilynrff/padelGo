@@ -93,7 +93,7 @@ export async function PATCH(
 
       return tx.booking.update({
         where: { id: params.id },
-        data: { status: normalized },
+        data: { status: normalized as "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED" | "PERLU_VERIFIKASI" },
         include: {
           user: { select: { id: true, name: true, email: true } },
           court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },

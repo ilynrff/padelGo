@@ -110,6 +110,13 @@ export async function POST(req: Request) {
       console.warn("API: Unauthorized booking creation attempt.");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Admin tidak boleh booking
+    if (session.user.role === "ADMIN") {
+      console.warn("API: Admin attempt to create booking denied.");
+      return NextResponse.json({ error: "Admin tidak boleh melakukan booking" }, { status: 403 });
+    }
+
     const userId = session.user.id;
 
     const body: unknown = await req.json();
