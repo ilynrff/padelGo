@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
+import { PaymentBadge } from "@/components/ui/PaymentBadge";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchJson } from "@/lib/fetchJson";
@@ -28,39 +29,46 @@ type Props = {
 
 function AdminBadge({ status }: { status: string }) {
   const s = String(status).toUpperCase();
-  if (s === "PENDING")
-    return (
-      <span className="bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded text-xs uppercase">
-        Pending
-      </span>
-    );
-  if (s === "PERLU_VERIFIKASI")
-    return (
-      <span className="bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded text-xs uppercase">
-        Verification
-      </span>
-    );
-  if (s === "CONFIRMED")
-    return (
-      <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase">
-        Confirmed
-      </span>
-    );
-  if (s === "CANCELLED")
-    return (
-      <span className="bg-red-100 text-red-700 font-bold px-2 py-1 rounded text-xs uppercase">
-        Cancelled
-      </span>
-    );
-  if (s === "EXPIRED")
-    return (
-      <span className="bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">
-        Expired
-      </span>
-    );
+
+  const badgeStyles: Record<
+    string,
+    { bg: string; text: string; label: string }
+  > = {
+    PENDING: {
+      bg: "bg-blue-50",
+      text: "text-blue-700",
+      label: "Pending",
+    },
+    PERLU_VERIFIKASI: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      label: "Verification",
+    },
+    CONFIRMED: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      label: "Confirmed",
+    },
+    CANCELLED: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      label: "Cancelled",
+    },
+    EXPIRED: {
+      bg: "bg-slate-100",
+      text: "text-slate-600",
+      label: "Expired",
+    },
+  };
+
+  const style = badgeStyles[s] || badgeStyles.PENDING;
+
   return (
-    <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">
-      {s}
+    <span
+      className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ${style.bg} ${style.text}`}
+    >
+      <span className={`w-2 h-2 rounded-full mr-2 ${style.text}`}></span>
+      {style.label}
     </span>
   );
 }
@@ -210,17 +218,26 @@ export function BookingManager({
         ))}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+      {/* Header */}
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold text-slate-900">Daftar Reservasi</h2>
+        <p className="text-sm text-slate-600">
+          Kelola dan verifikasi semua reservasi lapangan padel
+        </p>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="space-y-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <input
           type="text"
-          placeholder="Cari ID / User / Court..."
-          className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-72"
+          placeholder="Cari ID, User, atau Court..."
+          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+        <div className="flex items-center gap-2 flex-wrap">
           <select
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold"
+            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             value={filter}
             onChange={(e) => {
               const v = e.target.value;
@@ -244,15 +261,15 @@ export function BookingManager({
               }
             }}
           >
-            <option value="all">Semua</option>
+            <option value="all">Semua Status</option>
             <option value="PENDING">Pending</option>
-            <option value="PERLU_VERIFIKASI">Verifikasi</option>
+            <option value="PERLU_VERIFIKASI">Perlu Verifikasi</option>
             <option value="CONFIRMED">Confirmed</option>
             <option value="CANCELLED">Cancelled</option>
             <option value="EXPIRED">Expired</option>
           </select>
           <select
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold"
+            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             value={sort}
             onChange={(e) => {
               const v = e.target.value;
@@ -263,36 +280,55 @@ export function BookingManager({
             <option value="asc">Terlama</option>
           </select>
           <Button variant="outline" onClick={refresh} isLoading={isRefreshing}>
-            Refresh
+            🔄 Refresh
           </Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <style>{`
+          .booking-table-scroll::-webkit-scrollbar {
+            height: 6px;
+          }
+          .booking-table-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .booking-table-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+          }
+          .booking-table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+        `}</style>
+        <div className="overflow-x-auto booking-table-scroll">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
               <tr>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   ID
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   User
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   Court
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
-                  Waktu
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
+                  Tanggal & Jam
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   Total
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   Payment
                 </th>
-                <th className="text-left p-4 font-black uppercase tracking-widest text-xs">
+                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
                   Status
+                </th>
+                <th className="text-center px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
+                  Aksi
                 </th>
               </tr>
             </thead>
@@ -300,45 +336,66 @@ export function BookingManager({
               {(isLoading ? [] : filtered).map((b) => (
                 <tr
                   key={b.id}
-                  className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer"
-                  onClick={() => setSelected(b)}
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors duration-100 group"
                 >
-                  <td className="p-4 font-black text-slate-900">
-                    {String(b.id).slice(0, 8)}
+                  <td className="px-6 py-4">
+                    <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">
+                      {String(b.id).slice(0, 8)}
+                    </code>
                   </td>
-                  <td className="p-4 font-bold text-slate-700">
+                  <td className="px-6 py-4 text-slate-900 font-medium">
                     {b.user?.name || "-"}
                   </td>
-                  <td className="p-4 font-bold text-slate-700">
+                  <td className="px-6 py-4 text-slate-700">
                     {b.court?.name || "-"}
                   </td>
-                  <td className="p-4 font-bold text-slate-700">
-                    {String(b.date).slice(0, 10)} •{" "}
-                    {formatMinutesToHHmm(b.startTime)}-
-                    {formatMinutesToHHmm(b.endTime)}
+                  <td className="px-6 py-4 text-slate-600 text-sm">
+                    <div className="font-medium">
+                      {String(b.date).slice(0, 10)}
+                    </div>
+                    <div className="text-slate-500">
+                      {formatMinutesToHHmm(b.startTime)}-
+                      {formatMinutesToHHmm(b.endTime)}
+                    </div>
                   </td>
-                  <td className="p-4 font-black text-blue-700">
+                  <td className="px-6 py-4 font-bold text-blue-600">
                     Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}
                   </td>
-                  <td className="p-4 font-bold text-slate-700">
-                    {b.payment?.status || "NOT_SUBMITTED"}
+                  <td className="px-6 py-4">
+                    <PaymentBadge
+                      status={b.payment?.status || "NOT_SUBMITTED"}
+                    />
                   </td>
-                  <td className="p-4">
+                  <td className="px-6 py-4">
                     <AdminBadge status={b.status} />
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => setSelected(b)}
+                      className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-sm rounded-lg transition-colors duration-200"
+                    >
+                      👁 Detail
+                    </button>
                   </td>
                 </tr>
               ))}
               {isLoading && (
                 <tr>
-                  <td className="p-6 text-slate-500 font-bold" colSpan={7}>
-                    Loading…
+                  <td
+                    className="px-6 py-8 text-slate-500 font-medium text-center"
+                    colSpan={8}
+                  >
+                    ⏳ Loading data...
                   </td>
                 </tr>
               )}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td className="p-6 text-slate-500 font-bold" colSpan={7}>
-                    Tidak ada data.
+                  <td
+                    className="px-6 py-8 text-slate-500 font-medium text-center"
+                    colSpan={8}
+                  >
+                    📭 Tidak ada reservasi
                   </td>
                 </tr>
               )}
@@ -349,76 +406,95 @@ export function BookingManager({
 
       {selected && (
         <div
-          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
           onClick={() => setSelected(null)}
         >
           <div
-            className="bg-white rounded-3xl w-full max-w-3xl p-6 shadow-2xl"
+            className="bg-white rounded-2xl w-full max-w-3xl p-8 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start gap-4 mb-6">
+            {/* Header */}
+            <div className="flex justify-between items-start gap-4 mb-8 pb-6 border-b border-slate-200">
               <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                  Booking
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Booking Details
                 </p>
-                <h3 className="text-2xl font-black text-slate-900">
-                  {selected.id}
+                <h3 className="text-2xl font-bold text-slate-900 mt-2">
+                  <code className="text-lg bg-slate-100 px-2 py-1 rounded text-slate-600">
+                    {selected.id}
+                  </code>
                 </h3>
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="w-10 h-10 rounded-full bg-slate-200 text-slate-500 font-bold"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200 text-slate-500 hover:text-slate-700"
               >
-                X
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-3">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Left Column - Info */}
+              <div className="space-y-6">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                     User
                   </p>
-                  <p className="font-bold text-slate-900">
+                  <p className="font-semibold text-slate-900 text-lg">
                     {selected.user?.name || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                     Court
                   </p>
-                  <p className="font-bold text-slate-900">
+                  <p className="font-semibold text-slate-900 text-lg">
                     {selected.court?.name || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    Waktu
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                    Tanggal & Waktu
                   </p>
-                  <p className="font-bold text-slate-900">
-                    {String(selected.date).slice(0, 10)} •{" "}
+                  <p className="font-semibold text-slate-900">
+                    {String(selected.date).slice(0, 10)}
+                  </p>
+                  <p className="text-sm text-slate-600 mt-1">
                     {formatMinutesToHHmm(selected.startTime)} -{" "}
                     {formatMinutesToHHmm(selected.endTime)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    Total
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                    Total Harga
                   </p>
-                  <p className="font-black text-blue-600 text-xl">
+                  <p className="font-bold text-blue-600 text-2xl">
                     Rp{" "}
                     {Number(selected.totalPrice || 0).toLocaleString("id-ID")}
                   </p>
                 </div>
                 <div className="pt-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                    Status Booking
+                  </p>
                   <AdminBadge status={selected.status} />
                 </div>
 
                 {String(selected.status).toUpperCase() === "PENDING" && (
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-4">
                     <Button
                       size="full"
-                      className="bg-emerald-600 hover:bg-emerald-700"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                       onClick={() =>
                         setConfirmModal({
                           type: "Approve",
@@ -426,12 +502,11 @@ export function BookingManager({
                         })
                       }
                     >
-                      Approve
+                      ✓ Approve
                     </Button>
                     <Button
                       size="full"
-                      variant="outline"
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      className="bg-red-600 hover:bg-red-700 text-white font-semibold"
                       onClick={() =>
                         setConfirmModal({
                           type: "Reject",
@@ -439,31 +514,19 @@ export function BookingManager({
                         })
                       }
                     >
-                      Reject
-                    </Button>
-                    <Button
-                      size="full"
-                      variant="outline"
-                      className="text-slate-600 border-slate-200 hover:bg-slate-50"
-                      onClick={() =>
-                        setConfirmModal({
-                          type: "Expire",
-                          bookingId: selected.id,
-                        })
-                      }
-                    >
-                      Expire
+                      ✗ Reject
                     </Button>
                   </div>
                 )}
               </div>
 
-              <div className="bg-slate-50 rounded-3xl p-5 border border-slate-100 flex flex-col">
-                <p className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">
+              {/* Right Column - Payment Proof */}
+              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-4">
                   Bukti Pembayaran
                 </p>
                 {selected.paymentProofUrl || selected.payment?.proofImage ? (
-                  <div className="w-full h-72 bg-white rounded-2xl overflow-hidden border border-slate-200">
+                  <div className="w-full h-72 bg-white rounded-lg overflow-hidden border border-slate-200 mb-4">
                     <img
                       src={
                         selected.paymentProofUrl || selected.payment?.proofImage
@@ -473,23 +536,39 @@ export function BookingManager({
                     />
                   </div>
                 ) : (
-                  <div className="w-full h-72 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center flex-col text-slate-400">
-                    <p className="text-sm font-bold">Belum ada bukti</p>
+                  <div className="w-full h-72 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center flex-col text-slate-400 mb-4">
+                    <svg
+                      width="40"
+                      height="40"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1"
+                      className="mb-2"
+                    >
+                      <path d="M4 16.5v2.5A2.5 2.5 0 0 0 6.5 21h11A2.5 2.5 0 0 0 20 18.5v-2.5M16 4l-4-4m0 0L8 4M12 0v12" />
+                    </svg>
+                    <p className="text-sm font-semibold">
+                      Belum ada bukti pembayaran
+                    </p>
                   </div>
                 )}
-                <div className="mt-4 text-xs font-bold text-slate-500">
-                  Payment status:{" "}
-                  {selected.payment?.status ||
-                    (selected.paymentProofUrl ? "SUBMITTED" : "NOT_SUBMITTED")}
+                <div className="bg-white rounded-lg p-3 border border-slate-200 mb-4">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                    Payment Status
+                  </p>
+                  <PaymentBadge
+                    status={selected.payment?.status || "NOT_SUBMITTED"}
+                  />
                 </div>
 
-                {/* Tombol verifikasi pembayaran untuk status PERLU_VERIFIKASI */}
+                {/* Tombol verifikasi pembayaran */}
                 {String(selected.status).toUpperCase() === "PERLU_VERIFIKASI" &&
                   selected.payment && (
-                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+                    <div className="flex gap-2 pt-4 border-t border-slate-200">
                       <Button
                         size="full"
-                        className="bg-emerald-600 hover:bg-emerald-700"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                         onClick={() =>
                           setConfirmModal({
                             type: "ApprovePayment",
@@ -497,12 +576,11 @@ export function BookingManager({
                           })
                         }
                       >
-                        ✓ Approve Payment
+                        ✓ Approve
                       </Button>
                       <Button
                         size="full"
-                        variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold"
                         onClick={() =>
                           setConfirmModal({
                             type: "RejectPayment",
@@ -510,7 +588,7 @@ export function BookingManager({
                           })
                         }
                       >
-                        ✗ Reject Payment
+                        ✗ Reject
                       </Button>
                     </div>
                   )}

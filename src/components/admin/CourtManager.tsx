@@ -141,88 +141,99 @@ export function CourtManager() {
         />
       )}
 
-      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <h2 className="font-black text-xl text-slate-900">
-          Data Lapangan Padel
+      {/* Header */}
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold text-slate-900">
+          Pengaturan Lapangan
         </h2>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={refresh} isLoading={isLoading}>
-            Refresh
-          </Button>
-          <Button onClick={openAdd}>+ Tambah Lapangan</Button>
-        </div>
+        <p className="text-sm text-slate-600">Kelola data lapangan padel</p>
       </div>
 
+      {/* Add Button */}
+      <Button
+        onClick={openAdd}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+      >
+        + Tambah Lapangan Baru
+      </Button>
+
+      {/* Courts List */}
       {isLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-8 animate-pulse">
-          Loading…
+        <div className="bg-white rounded-xl border border-slate-200 p-8 animate-pulse">
+          ⏳ Loading...
+        </div>
+      ) : courts.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
+          <p className="text-slate-400 font-semibold">📭 Belum ada lapangan</p>
+          <p className="text-slate-500 text-sm mt-1">
+            Tambahkan lapangan baru untuk memulai
+          </p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {courts.map((c) => (
             <div
               key={c.id}
-              className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between"
+              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200"
             >
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-bold text-slate-900">
-                    Rp {Number(c.pricePerHour || 0).toLocaleString("id-ID")}/jam
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold text-xs whitespace-nowrap">
+                        Rp {Number(c.pricePerHour || 0).toLocaleString("id-ID")}
+                        /jam
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-base truncate">
+                      {c.name}
+                    </h4>
+                    <p className="text-slate-600 text-sm flex items-center gap-1 mt-1">
+                      <span>📍</span>
+                      <span className="truncate">{c.location}</span>
+                    </p>
+                  </div>
                 </div>
-                <h3 className="font-black text-lg text-slate-900 mb-1">
-                  {c.name}
-                </h3>
-                <p className="text-slate-500 font-medium text-sm mb-4">
-                  {c.location}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="full"
-                  variant="outline"
-                  onClick={() => openEdit(c)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="full"
-                  variant="outline"
-                  className="text-red-500 border-red-200 hover:bg-red-50"
-                  onClick={() => handleDelete(c.id)}
-                >
-                  Hapus
-                </Button>
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="flex-1 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-sm rounded-lg transition-colors duration-200"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="flex-1 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm rounded-lg transition-colors duration-200"
+                  >
+                    🗑️ Hapus
+                  </button>
+                </div>
               </div>
             </div>
           ))}
-          {courts.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-400 font-bold">
-              Belum ada data lapangan.
-            </div>
-          )}
         </div>
       )}
 
       {modalMode && editingCourt && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
           <form
             onSubmit={handleSave}
-            className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl"
+            className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl"
           >
-            <h3 className="font-black text-xl text-slate-900 mb-6">
-              {modalMode === "add" ? "Tambah Lapangan" : "Edit Lapangan"}
+            <h3 className="font-bold text-2xl text-slate-900 mb-6">
+              {modalMode === "add" ? "Tambah Lapangan Baru" : "Edit Lapangan"}
             </h3>
 
-            <div className="space-y-4 mb-8">
+            <div className="space-y-5 mb-8">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                   Nama Lapangan
                 </label>
                 <input
                   required
                   type="text"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500"
+                  placeholder="Contoh: Court A1"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={editingCourt.name}
                   onChange={(e) =>
                     setEditingCourt({ ...editingCourt, name: e.target.value })
@@ -230,13 +241,14 @@ export function CourtManager() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                   Lokasi
                 </label>
                 <input
                   required
                   type="text"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500"
+                  placeholder="Contoh: Basement, Level 2"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={editingCourt.location}
                   onChange={(e) =>
                     setEditingCourt({
@@ -247,14 +259,15 @@ export function CourtManager() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Harga / Jam
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Harga Per Jam (Rp)
                 </label>
                 <input
                   required
                   type="number"
                   min={0}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500"
+                  placeholder="0"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={editingCourt.pricePerHour ?? ""}
                   onChange={(e) =>
                     setEditingCourt({
@@ -265,13 +278,13 @@ export function CourtManager() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Image URL (optional)
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Image URL (Opsional)
                 </label>
                 <input
                   type="text"
-                  placeholder="https://..."
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500"
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={editingCourt.image ?? ""}
                   onChange={(e) =>
                     setEditingCourt({ ...editingCourt, image: e.target.value })
@@ -279,12 +292,12 @@ export function CourtManager() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Deskripsi (optional)
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Deskripsi (Opsional)
                 </label>
                 <textarea
-                  placeholder="Masukkan deskripsi lapangan..."
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500 resize-none"
+                  placeholder="Masukkan deskripsi lapangan padel..."
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                   rows={3}
                   value={editingCourt.description ?? ""}
                   onChange={(e) =>
@@ -295,29 +308,12 @@ export function CourtManager() {
                   }
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Deskripsi (optional)
-                </label>
-                <textarea
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-900 focus:outline-blue-500 min-h-20 resize-none"
-                  value={editingCourt.description ?? ""}
-                  onChange={(e) =>
-                    setEditingCourt({
-                      ...editingCourt,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Deskripsi lapangan padel..."
-                />
-              </div>
             </div>
 
             <div className="flex gap-3">
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                className="w-full"
+                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors duration-200"
                 disabled={isSaving}
                 onClick={() => {
                   setModalMode(null);
@@ -325,10 +321,14 @@ export function CourtManager() {
                 }}
               >
                 Batal
-              </Button>
-              <Button type="submit" className="w-full" isLoading={isSaving}>
-                Simpan
-              </Button>
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 disabled:opacity-50"
+                disabled={isSaving}
+              >
+                {isSaving ? "Menyimpan..." : "Simpan"}
+              </button>
             </div>
           </form>
         </div>
