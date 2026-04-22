@@ -13,17 +13,17 @@ function LoginContent() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ main: string; hint?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setError("Email dan password wajib diisi.");
+      setError({ main: "Email dan password wajib diisi." });
       return;
     }
 
-    setError("");
+    setError(null);
     setIsLoading(true);
 
     const result = await signIn("credentials", {
@@ -34,7 +34,15 @@ function LoginContent() {
 
     setIsLoading(false);
     if (!result || result.error) {
-      setError(result?.error || "Gagal login.");
+      const rawError = result?.error || "";
+      if (rawError.includes("EMAIL_OR_PASSWORD_WRONG")) {
+        setError({
+          main: "Email atau password salah.",
+          hint: "Pastikan akun sudah terdaftar atau periksa kembali email dan password Anda.",
+        });
+      } else {
+        setError({ main: rawError || "Gagal login. Coba lagi." });
+      }
       return;
     }
 
@@ -91,20 +99,18 @@ function LoginContent() {
           />
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-600 flex items-center gap-2">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
-              {error}
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-1">
+              <div className="flex items-center gap-2 text-sm font-bold text-red-600">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                {error.main}
+              </div>
+              {error.hint && (
+                <p className="text-xs text-red-500 font-medium pl-6">{error.hint}</p>
+              )}
             </div>
           )}
 

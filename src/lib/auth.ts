@@ -21,12 +21,14 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
-          throw new Error("Email atau password salah");
+          const hint = process.env.NODE_ENV === "development" ? " [dev: email tidak ditemukan]" : "";
+          throw new Error(`EMAIL_OR_PASSWORD_WRONG${hint}`);
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) {
-          throw new Error("Email atau password salah");
+          const hint = process.env.NODE_ENV === "development" ? " [dev: password salah]" : "";
+          throw new Error(`EMAIL_OR_PASSWORD_WRONG${hint}`);
         }
 
         return {
