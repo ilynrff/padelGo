@@ -7,21 +7,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const VALID_STATUSES = ["PENDING", "CONFIRMED", "CANCELLED", "EXPIRED", "COMPLETED", "REFUNDED", "PERLU_VERIFIKASI"];
+
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  console.log("API: Fetching booking...", params.id);
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userRole = session.user.role;
-    const userId = session.user.id;
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const booking = await prisma.booking.findFirst({
       where: {
         id: params.id,
-        ...(userRole === "ADMIN" ? {} : { userId }),
+        ...(session.user.role === "ADMIN" ? {} : { userId: session.user.id }),
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
@@ -30,37 +26,29 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       },
     });
 
-    if (!booking) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(booking, { status: 200 });
+    if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(booking);
   } catch (error: unknown) {
-    console.error("API Error [GET /api/bookings/[id]]:", error);
     return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(error) }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body: unknown = await req.json();
-    const payload = (body ?? {}) as Record<string, unknown>;
-    const status = payload.status;
+    const body = (await req.json()) as Record<string, unknown>;
+    const status = body.status;
     if (!status || typeof status !== "string") {
       return NextResponse.json({ error: "Status is required" }, { status: 400 });
     }
 
     const normalized = String(status).toUpperCase();
-    if (!["PENDING", "CONFIRMED", "CANCELLED", "EXPIRED"].includes(normalized)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    if (!VALID_STATUSES.includes(normalized)) {
+      return NextResponse.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
     }
 
     const updatedBooking = await prisma.$transaction(async (tx) => {
@@ -68,12 +56,11 @@ export async function PATCH(
         where: { id: params.id },
         include: { payment: true },
       });
-      if (!booking) {
-        return null;
-      }
+      if (!booking) return null;
+
+      let refundAmount: number | undefined = undefined;
 
       if (normalized === "CONFIRMED") {
-        // If a payment exists, confirm it too. If not, we still allow manual confirmation.
         if (booking.payment) {
           await tx.payment.update({
             where: { id: booking.payment.id },
@@ -91,9 +78,31 @@ export async function PATCH(
         }
       }
 
+      if (normalized === "REFUNDED") {
+        // Calculate refund: booking date is in UTC, endTime is minutes from midnight
+        const bookingStart = new Date(booking.date);
+        bookingStart.setUTCMinutes(bookingStart.getUTCMinutes() + booking.startTime);
+        const now = new Date();
+        const hoursUntilGame = (bookingStart.getTime() - now.getTime()) / 3600000;
+
+        // >= 2 hours before: 100% refund, < 2 hours: 50% refund
+        const refundPercent = hoursUntilGame >= 2 ? 100 : 50;
+        refundAmount = Math.round((booking.totalPrice * refundPercent) / 100);
+
+        if (booking.payment) {
+          await tx.payment.update({
+            where: { id: booking.payment.id },
+            data: { status: "REJECTED" },
+          });
+        }
+      }
+
       return tx.booking.update({
         where: { id: params.id },
-        data: { status: normalized as "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED" | "PERLU_VERIFIKASI" },
+        data: {
+          status: normalized as any,
+          ...(refundAmount !== undefined ? { refundAmount } : {}),
+        },
         include: {
           user: { select: { id: true, name: true, email: true } },
           court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
@@ -102,11 +111,8 @@ export async function PATCH(
       });
     });
 
-    if (!updatedBooking) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(updatedBooking, { status: 200 });
+    if (!updatedBooking) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(updatedBooking);
   } catch (error: unknown) {
     console.error("Error updating booking:", error);
     return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(error) }, { status: 500 });

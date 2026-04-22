@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
-import { PaymentBadge } from "@/components/ui/PaymentBadge";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchJson } from "@/lib/fetchJson";
@@ -16,98 +15,68 @@ type Booking = {
   status: string;
   totalPrice: number;
   createdAt: string;
+  expiresAt?: string;
   paymentProofUrl?: string;
-  user?: { name?: string };
-  court?: { name?: string };
+  rescheduleDate?: string | null;
+  rescheduleStartTime?: number | null;
+  rescheduleEndTime?: number | null;
+  rescheduleNote?: string | null;
+  user?: { name?: string; email?: string };
+  court?: { name?: string; location?: string };
   payment?: { status?: string; proofImage?: string } | null;
 };
 
-type Props = {
-  initialBookings?: Booking[];
-  isLoading?: boolean;
+type Props = { initialBookings?: Booking[]; isLoading?: boolean };
+
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  PENDING:               { label: "Menunggu Bayar",     bg: "bg-orange-100", text: "text-orange-700" },
+  PERLU_VERIFIKASI:      { label: "Perlu Verifikasi",   bg: "bg-amber-100",  text: "text-amber-700" },
+  CONFIRMED:             { label: "Confirmed",           bg: "bg-emerald-100",text: "text-emerald-700" },
+  CANCELLED:             { label: "Cancelled",           bg: "bg-red-100",    text: "text-red-700" },
+  EXPIRED:               { label: "Expired",             bg: "bg-slate-200",  text: "text-slate-600" },
+  COMPLETED:             { label: "Completed",           bg: "bg-blue-100",   text: "text-blue-700" },
+  RESCHEDULE_REQUESTED:  { label: "Reschedule ⏳",       bg: "bg-violet-100", text: "text-violet-700" },
+  RESCHEDULE_APPROVED:   { label: "Reschedule ✓",       bg: "bg-teal-100",   text: "text-teal-700" },
+  RESCHEDULE_REJECTED:   { label: "Reschedule ✕",       bg: "bg-rose-100",   text: "text-rose-700" },
 };
 
-function AdminBadge({ status }: { status: string }) {
-  const s = String(status).toUpperCase();
-
-  const badgeStyles: Record<
-    string,
-    { bg: string; text: string; label: string }
-  > = {
-    PENDING: {
-      bg: "bg-blue-50",
-      text: "text-blue-700",
-      label: "Pending",
-    },
-    PERLU_VERIFIKASI: {
-      bg: "bg-amber-50",
-      text: "text-amber-700",
-      label: "Verification",
-    },
-    CONFIRMED: {
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
-      label: "Confirmed",
-    },
-    CANCELLED: {
-      bg: "bg-red-50",
-      text: "text-red-700",
-      label: "Cancelled",
-    },
-    EXPIRED: {
-      bg: "bg-slate-100",
-      text: "text-slate-600",
-      label: "Expired",
-    },
-  };
-
-  const style = badgeStyles[s] || badgeStyles.PENDING;
-
+function StatusPill({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status.toUpperCase()] ?? { label: status, bg: "bg-slate-100", text: "text-slate-700" };
   return (
-    <span
-      className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ${style.bg} ${style.text}`}
-    >
-      <span className={`w-2 h-2 rounded-full mr-2 ${style.text}`}></span>
-      {style.label}
+    <span className={`inline-block text-[11px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
+      {cfg.label}
     </span>
   );
 }
 
-export function BookingManager({
-  initialBookings = [],
-  isLoading = false,
-}: Props) {
+function CourtAvailTag({ booking }: { booking: Booking }) {
+  const s = String(booking.status).toUpperCase();
+  if (!["CONFIRMED", "RESCHEDULE_APPROVED"].includes(s)) return null;
+  const now = new Date();
+  const start = new Date(booking.date);
+  start.setUTCMinutes(start.getUTCMinutes() + booking.startTime);
+  const end = new Date(booking.date);
+  end.setUTCMinutes(end.getUTCMinutes() + booking.endTime);
+  if (now >= start && now < end) return <span className="text-[11px] font-bold text-red-600">🔴 Sedang Dipakai</span>;
+  if (now < start) return <span className="text-[11px] font-bold text-amber-600">🟡 Akan Dipakai</span>;
+  return <span className="text-[11px] font-medium text-slate-400">Selesai</span>;
+}
+
+export function BookingManager({ initialBookings = [], isLoading = false }: Props) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const [filter, setFilter] = useState<
-    | "all"
-    | "PENDING"
-    | "PERLU_VERIFIKASI"
-    | "CONFIRMED"
-    | "CANCELLED"
-    | "EXPIRED"
-  >("all");
+  const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
-
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [confirmModal, setConfirmModal] = useState<{
-    type: "Approve" | "Reject" | "Expire" | "ApprovePayment" | "RejectPayment";
-    bookingId: string;
-  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [toastQueue, setToastQueue] = useState<
-    { msg: string; type: "success" | "error" }[]
-  >([]);
+  const [toastQueue, setToastQueue] = useState<{ msg: string; type: "success" | "error" }[]>([]);
 
-  useEffect(() => {
-    setBookings(initialBookings);
-  }, [initialBookings]);
+  useEffect(() => { setBookings(initialBookings); }, [initialBookings]);
 
   const showToast = (msg: string, type: "success" | "error") => {
-    setToastQueue((prev) => [...prev, { msg, type }]);
-    setTimeout(() => setToastQueue((prev) => prev.slice(1)), 3000);
+    setToastQueue((q) => [...q, { msg, type }]);
+    setTimeout(() => setToastQueue((q) => q.slice(1)), 3500);
   };
 
   const refresh = async () => {
@@ -115,528 +84,249 @@ export function BookingManager({
     try {
       const data = await fetchJson<Booking[]>("/api/bookings");
       setBookings(Array.isArray(data) ? data : []);
-    } catch (e: unknown) {
-      showToast(getErrorMessage(e) || "Terjadi kesalahan", "error");
-    } finally {
-      setIsRefreshing(false);
-    }
+    } catch (e) { showToast(getErrorMessage(e) || "Error", "error"); }
+    finally { setIsRefreshing(false); }
   };
 
-  const handleAction = async () => {
-    if (!confirmModal) return;
+  const patchStatus = async (id: string, status: string) => {
     setIsProcessing(true);
-
     try {
-      // Handle payment verification
-      if (
-        confirmModal.type === "ApprovePayment" ||
-        confirmModal.type === "RejectPayment"
-      ) {
-        const action =
-          confirmModal.type === "ApprovePayment" ? "APPROVE" : "REJECT";
-        const data = await fetchJson<{ booking: Booking }>(
-          `/api/admin/verify-payment`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bookingId: confirmModal.bookingId, action }),
-          },
-        );
+      const data = await fetchJson<Booking>(`/api/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      setBookings((prev) => prev.map((b) => (b.id === id ? data : b)));
+      if (selected?.id === id) setSelected(data);
+      showToast(`Status berhasil diubah ke ${STATUS_CONFIG[status]?.label ?? status}`, "success");
+    } catch (e) { showToast(getErrorMessage(e) || "Gagal update", "error"); }
+    finally { setIsProcessing(false); }
+  };
 
-        setBookings((prev) =>
-          prev.map((b) => (b.id === confirmModal.bookingId ? data.booking : b)),
-        );
-        showToast(
-          `Pembayaran berhasil di-${action === "APPROVE" ? "approve" : "reject"}`,
-          "success",
-        );
-      } else {
-        // Handle booking status update
-        const newStatus =
-          confirmModal.type === "Approve"
-            ? "CONFIRMED"
-            : confirmModal.type === "Reject"
-              ? "CANCELLED"
-              : "EXPIRED";
-
-        const data = await fetchJson<Booking>(
-          `/api/bookings/${confirmModal.bookingId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: newStatus }),
-          },
-        );
-
-        setBookings((prev) =>
-          prev.map((b) => (b.id === confirmModal.bookingId ? data : b)),
-        );
-        showToast(`Booking berhasil di-update ke ${newStatus}`, "success");
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      showToast(getErrorMessage(err) || "Terjadi kesalahan", "error");
-    } finally {
-      setIsProcessing(false);
-      setConfirmModal(null);
-      setSelected(null);
-    }
+  const patchReschedule = async (id: string, action: "approve" | "reject") => {
+    setIsProcessing(true);
+    try {
+      const data = await fetchJson<Booking>(`/api/bookings/${id}/reschedule`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      setBookings((prev) => prev.map((b) => (b.id === id ? data : b)));
+      if (selected?.id === id) setSelected(data);
+      showToast(`Reschedule berhasil di-${action}`, "success");
+    } catch (e) { showToast(getErrorMessage(e) || "Gagal", "error"); }
+    finally { setIsProcessing(false); }
   };
 
   const filtered = useMemo(() => {
     let list = bookings.slice();
-    if (filter !== "all")
-      list = list.filter((b) => String(b.status).toUpperCase() === filter);
+    if (filter !== "all") list = list.filter((b) => b.status.toUpperCase() === filter);
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((b) => {
-        const id = String(b.id || "").toLowerCase();
-        const userName = String(b.user?.name || "").toLowerCase();
-        const courtName = String(b.court?.name || "").toLowerCase();
-        return id.includes(q) || userName.includes(q) || courtName.includes(q);
-      });
+      list = list.filter((b) =>
+        b.id.toLowerCase().includes(q) ||
+        (b.user?.name ?? "").toLowerCase().includes(q) ||
+        (b.court?.name ?? "").toLowerCase().includes(q),
+      );
     }
-    list.sort((a, b) =>
-      sort === "desc"
-        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    list.sort((a, b) => sort === "desc"
+      ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
     return list;
   }, [bookings, filter, search, sort]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Toast */}
       <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
-        {toastQueue.map((t, idx) => (
-          <Toast
-            key={idx}
-            isOpen={true}
-            message={t.msg}
-            type={t.type}
-            onClose={() => {}}
-          />
+        {toastQueue.map((t, i) => <Toast key={i} isOpen message={t.msg} type={t.type} onClose={() => {}} />)}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <input
+          type="text" placeholder="Cari user / court…"
+          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1 min-w-[160px]"
+          value={search} onChange={(e) => setSearch(e.target.value)}
+        />
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
+          <option value="all">Semua</option>
+          {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value as "desc" | "asc")}
+          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
+          <option value="desc">Terbaru</option>
+          <option value="asc">Terlama</option>
+        </select>
+        <Button variant="outline" onClick={refresh} isLoading={isRefreshing} className="shrink-0 text-sm">
+          ↻ Refresh
+        </Button>
+      </div>
+
+      {/* Card Grid */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {isLoading && [1,2,3].map(i => (
+          <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse h-40"/>
+        ))}
+        {!isLoading && filtered.length === 0 && (
+          <div className="sm:col-span-2 xl:col-span-3 bg-white rounded-2xl p-8 text-center text-slate-400 font-bold border border-slate-100">
+            Tidak ada data.
+          </div>
+        )}
+        {(!isLoading ? filtered : []).map((b) => (
+          <div key={b.id}
+            className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col">
+            {/* Court image strip */}
+            <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-400" />
+            <div className="p-4 flex-1 space-y-2">
+              {/* Court name */}
+              <div className="font-black text-slate-900 text-sm truncate" title={b.court?.name ?? "—"}>
+                {b.court?.name ?? "—"}
+              </div>
+              {/* User */}
+              <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
+                {b.user?.name ?? "—"}
+              </div>
+              {/* Date & time */}
+              <div className="text-xs font-bold text-slate-700">
+                {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
+              </div>
+              {/* Price */}
+              <div className="text-sm font-black text-blue-700">
+                Rp {Number(b.totalPrice ?? 0).toLocaleString("id-ID")}
+              </div>
+              {/* Status row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusPill status={b.status} />
+                <CourtAvailTag booking={b} />
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="border-t border-slate-100 px-4 py-3">
+              <button onClick={() => setSelected(b)}
+                className="w-full text-xs font-black text-blue-600 border border-blue-200 rounded-xl py-2 hover:bg-blue-50 active:scale-95 transition-all">
+                Lihat Detail
+              </button>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Header */}
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-slate-900">Daftar Reservasi</h2>
-        <p className="text-sm text-slate-600">
-          Kelola dan verifikasi semua reservasi lapangan padel
-        </p>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="space-y-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <input
-          type="text"
-          placeholder="Cari ID, User, atau Court..."
-          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            value={filter}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (
-                v === "all" ||
-                v === "PENDING" ||
-                v === "CONFIRMED" ||
-                v === "CANCELLED" ||
-                v === "EXPIRED" ||
-                v === "PERLU_VERIFIKASI"
-              ) {
-                setFilter(
-                  v as
-                    | "all"
-                    | "PENDING"
-                    | "PERLU_VERIFIKASI"
-                    | "CONFIRMED"
-                    | "CANCELLED"
-                    | "EXPIRED",
-                );
-              }
-            }}
-          >
-            <option value="all">Semua Status</option>
-            <option value="PENDING">Pending</option>
-            <option value="PERLU_VERIFIKASI">Perlu Verifikasi</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="EXPIRED">Expired</option>
-          </select>
-          <select
-            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            value={sort}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "desc" || v === "asc") setSort(v);
-            }}
-          >
-            <option value="desc">Terbaru</option>
-            <option value="asc">Terlama</option>
-          </select>
-          <Button variant="outline" onClick={refresh} isLoading={isRefreshing}>
-            🔄 Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <style>{`
-          .booking-table-scroll::-webkit-scrollbar {
-            height: 6px;
-          }
-          .booking-table-scroll::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .booking-table-scroll::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-          }
-          .booking-table-scroll::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-          }
-        `}</style>
-        <div className="overflow-x-auto booking-table-scroll">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-              <tr>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  ID
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  User
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Court
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Tanggal & Jam
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Payment
-                </th>
-                <th className="text-left px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="text-center px-6 py-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {(isLoading ? [] : filtered).map((b) => (
-                <tr
-                  key={b.id}
-                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors duration-100 group"
-                >
-                  <td className="px-6 py-4">
-                    <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">
-                      {String(b.id).slice(0, 8)}
-                    </code>
-                  </td>
-                  <td className="px-6 py-4 text-slate-900 font-medium">
-                    {b.user?.name || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-slate-700">
-                    {b.court?.name || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-slate-600 text-sm">
-                    <div className="font-medium">
-                      {String(b.date).slice(0, 10)}
-                    </div>
-                    <div className="text-slate-500">
-                      {formatMinutesToHHmm(b.startTime)}-
-                      {formatMinutesToHHmm(b.endTime)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-blue-600">
-                    Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}
-                  </td>
-                  <td className="px-6 py-4">
-                    <PaymentBadge
-                      status={b.payment?.status || "NOT_SUBMITTED"}
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <AdminBadge status={b.status} />
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => setSelected(b)}
-                      className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-sm rounded-lg transition-colors duration-200"
-                    >
-                      👁 Detail
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {isLoading && (
-                <tr>
-                  <td
-                    className="px-6 py-8 text-slate-500 font-medium text-center"
-                    colSpan={8}
-                  >
-                    ⏳ Loading data...
-                  </td>
-                </tr>
-              )}
-              {!isLoading && filtered.length === 0 && (
-                <tr>
-                  <td
-                    className="px-6 py-8 text-slate-500 font-medium text-center"
-                    colSpan={8}
-                  >
-                    📭 Tidak ada reservasi
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+      {/* Detail Drawer / Modal */}
       {selected && (
-        <div
-          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-3xl p-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-[250] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => setSelected(null)}>
+          <div className="bg-white w-full sm:max-w-xl max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex justify-between items-start gap-4 mb-8 pb-6 border-b border-slate-200">
+            <div className="sticky top-0 bg-white border-b border-slate-100 px-6 pt-5 pb-4 flex justify-between items-start rounded-t-3xl">
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Booking Details
-                </p>
-                <h3 className="text-2xl font-bold text-slate-900 mt-2">
-                  <code className="text-lg bg-slate-100 px-2 py-1 rounded text-slate-600">
-                    {selected.id}
-                  </code>
-                </h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Booking Detail</p>
+                <h3 className="text-lg font-black text-slate-900">{String(selected.id).slice(0, 12)}…</h3>
               </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200 text-slate-500 hover:text-slate-700"
-              >
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <button onClick={() => setSelected(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold flex items-center justify-center">
+                ✕
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Left Column - Info */}
-              <div className="space-y-6">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    User
-                  </p>
-                  <p className="font-semibold text-slate-900 text-lg">
-                    {selected.user?.name || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Court
-                  </p>
-                  <p className="font-semibold text-slate-900 text-lg">
-                    {selected.court?.name || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Tanggal & Waktu
-                  </p>
-                  <p className="font-semibold text-slate-900">
-                    {String(selected.date).slice(0, 10)}
-                  </p>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {formatMinutesToHHmm(selected.startTime)} -{" "}
-                    {formatMinutesToHHmm(selected.endTime)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Total Harga
-                  </p>
-                  <p className="font-bold text-blue-600 text-2xl">
-                    Rp{" "}
-                    {Number(selected.totalPrice || 0).toLocaleString("id-ID")}
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Status Booking
-                  </p>
-                  <AdminBadge status={selected.status} />
-                </div>
-
-                {String(selected.status).toUpperCase() === "PENDING" && (
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      size="full"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                      onClick={() =>
-                        setConfirmModal({
-                          type: "Approve",
-                          bookingId: selected.id,
-                        })
-                      }
-                    >
-                      ✓ Approve
-                    </Button>
-                    <Button
-                      size="full"
-                      className="bg-red-600 hover:bg-red-700 text-white font-semibold"
-                      onClick={() =>
-                        setConfirmModal({
-                          type: "Reject",
-                          bookingId: selected.id,
-                        })
-                      }
-                    >
-                      ✗ Reject
-                    </Button>
+            <div className="p-6 space-y-5">
+              {/* Info rows */}
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                {[
+                  ["Court", selected.court?.name ?? "—"],
+                  ["Lokasi", selected.court?.location ?? "—"],
+                  ["User", selected.user?.name ?? "—"],
+                  ["Email", selected.user?.email ?? "—"],
+                  ["Tanggal", String(selected.date).slice(0, 10)],
+                  ["Jam", `${formatMinutesToHHmm(selected.startTime)} – ${formatMinutesToHHmm(selected.endTime)}`],
+                  ["Total", `Rp ${Number(selected.totalPrice ?? 0).toLocaleString("id-ID")}`],
+                  ["Payment", selected.payment?.status ?? "NOT_SUBMITTED"],
+                ].map(([l, v]) => (
+                  <div key={l} className="flex gap-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest w-20 shrink-0 pt-0.5">{l}</span>
+                    <span className="text-sm font-bold text-slate-800 break-words">{v}</span>
                   </div>
-                )}
+                ))}
+                <div className="flex gap-3 items-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest w-20 shrink-0">Status</span>
+                  <StatusPill status={selected.status} />
+                  <CourtAvailTag booking={selected} />
+                </div>
               </div>
 
-              {/* Right Column - Payment Proof */}
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-4">
-                  Bukti Pembayaran
-                </p>
+              {/* Reschedule Request Info */}
+              {selected.status === "RESCHEDULE_REQUESTED" && selected.rescheduleDate && (
+                <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs font-black text-violet-700 uppercase tracking-widest">Permintaan Reschedule</p>
+                  <p className="text-sm font-bold text-violet-900">
+                    {String(selected.rescheduleDate).slice(0, 10)} ·{" "}
+                    {formatMinutesToHHmm(selected.rescheduleStartTime ?? 0)} – {formatMinutesToHHmm(selected.rescheduleEndTime ?? 0)}
+                  </p>
+                  {selected.rescheduleNote && (
+                    <p className="text-xs text-violet-600">Catatan: {selected.rescheduleNote}</p>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      disabled={isProcessing}
+                      onClick={() => patchReschedule(selected.id, "approve")}
+                      className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-colors disabled:opacity-60">
+                      ✓ Approve Reschedule
+                    </button>
+                    <button
+                      disabled={isProcessing}
+                      onClick={() => patchReschedule(selected.id, "reject")}
+                      className="flex-1 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-black transition-colors disabled:opacity-60">
+                      ✕ Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Proof */}
+              <div>
+                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Bukti Pembayaran</p>
                 {selected.paymentProofUrl || selected.payment?.proofImage ? (
-                  <div className="w-full h-72 bg-white rounded-lg overflow-hidden border border-slate-200 mb-4">
-                    <img
-                      src={
-                        selected.paymentProofUrl || selected.payment?.proofImage
-                      }
-                      className="w-full h-full object-contain"
-                      alt="Proof"
-                    />
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={selected.paymentProofUrl ?? selected.payment?.proofImage}
+                      alt="Bukti" className="w-full object-contain max-h-60" />
                   </div>
                 ) : (
-                  <div className="w-full h-72 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center flex-col text-slate-400 mb-4">
-                    <svg
-                      width="40"
-                      height="40"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      className="mb-2"
-                    >
-                      <path d="M4 16.5v2.5A2.5 2.5 0 0 0 6.5 21h11A2.5 2.5 0 0 0 20 18.5v-2.5M16 4l-4-4m0 0L8 4M12 0v12" />
-                    </svg>
-                    <p className="text-sm font-semibold">
-                      Belum ada bukti pembayaran
-                    </p>
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 h-28 flex items-center justify-center text-slate-400 text-sm font-bold">
+                    Belum ada bukti
                   </div>
                 )}
-                <div className="bg-white rounded-lg p-3 border border-slate-200 mb-4">
-                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                    Payment Status
-                  </p>
-                  <PaymentBadge
-                    status={selected.payment?.status || "NOT_SUBMITTED"}
-                  />
-                </div>
-
-                {/* Tombol verifikasi pembayaran */}
-                {String(selected.status).toUpperCase() === "PERLU_VERIFIKASI" &&
-                  selected.payment && (
-                    <div className="flex gap-2 pt-4 border-t border-slate-200">
-                      <Button
-                        size="full"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                        onClick={() =>
-                          setConfirmModal({
-                            type: "ApprovePayment",
-                            bookingId: selected.id,
-                          })
-                        }
-                      >
-                        ✓ Approve
-                      </Button>
-                      <Button
-                        size="full"
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold"
-                        onClick={() =>
-                          setConfirmModal({
-                            type: "RejectPayment",
-                            bookingId: selected.id,
-                          })
-                        }
-                      >
-                        ✗ Reject
-                      </Button>
-                    </div>
-                  )}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {confirmModal && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          onClick={() => !isProcessing && setConfirmModal(null)}
-        >
-          <div
-            className="bg-white p-6 rounded-3xl max-w-sm w-full shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-xl font-black text-slate-900 mb-2">
-              {confirmModal.type === "ApprovePayment"
-                ? "Approve Pembayaran"
-                : confirmModal.type === "RejectPayment"
-                  ? "Reject Pembayaran"
-                  : `Konfirmasi ${confirmModal.type}`}
-            </h3>
-            <p className="text-slate-500 text-sm font-medium mb-6">
-              {confirmModal.type === "ApprovePayment"
-                ? "Pembayaran akan dikonfirmasi dan booking akan langsung CONFIRMED."
-                : confirmModal.type === "RejectPayment"
-                  ? "Pembayaran akan ditolak dan booking akan CANCELLED."
-                  : `Yakin ingin ${confirmModal.type.toLowerCase()} booking ini?`}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled={isProcessing}
-                onClick={() => setConfirmModal(null)}
-              >
-                Batal
-              </Button>
-              <Button
-                className="w-full"
-                isLoading={isProcessing}
-                onClick={handleAction}
-              >
-                Ya
-              </Button>
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                {["PENDING", "PERLU_VERIFIKASI"].includes(selected.status) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "CONFIRMED")}
+                      className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-colors disabled:opacity-60">
+                      ✓ Approve
+                    </button>
+                    <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "CANCELLED")}
+                      className="py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-black transition-colors disabled:opacity-60">
+                      ✕ Reject
+                    </button>
+                  </div>
+                )}
+                {["CONFIRMED", "RESCHEDULE_REJECTED"].includes(selected.status) && (
+                  <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "CANCELLED")}
+                    className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition-colors disabled:opacity-60">
+                    Cancel Booking
+                  </button>
+                )}
+                {selected.status === "PENDING" && (
+                  <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "EXPIRED")}
+                    className="w-full py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold transition-colors disabled:opacity-60">
+                    Mark as Expired
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

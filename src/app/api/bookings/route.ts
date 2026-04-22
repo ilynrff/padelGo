@@ -88,6 +88,27 @@ export async function GET() {
       data: { status: "EXPIRED" },
     });
 
+    // Auto-complete CONFIRMED bookings whose end time has passed
+    // endTime is stored as minutes from midnight UTC
+    // We compare by finding bookings where date + endTime (in minutes) < now
+    const allConfirmed = await prisma.booking.findMany({
+      where: { status: "CONFIRMED" },
+      select: { id: true, date: true, endTime: true },
+    });
+    const completedIds = allConfirmed
+      .filter((b) => {
+        const endDateTime = new Date(b.date);
+        endDateTime.setUTCMinutes(endDateTime.getUTCMinutes() + b.endTime);
+        return endDateTime < now;
+      })
+      .map((b) => b.id);
+    if (completedIds.length > 0) {
+      await prisma.booking.updateMany({
+        where: { id: { in: completedIds } },
+        data: { status: "COMPLETED" },
+      });
+    }
+
     const bookings = await prisma.booking.findMany({
       where: userRole === "ADMIN" ? {} : { userId },
       include: {

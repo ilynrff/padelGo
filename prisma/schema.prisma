@@ -12,6 +12,10 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   EXPIRED
+  COMPLETED
+  RESCHEDULE_REQUESTED
+  RESCHEDULE_APPROVED
+  RESCHEDULE_REJECTED
 }
 
 enum PaymentStatus {
@@ -32,15 +36,15 @@ model User {
 }
 
 model Court {
-  id          String    @id @default(uuid())
-  name        String
-  location    String
+  id           String    @id @default(uuid())
+  name         String
+  location     String
   pricePerHour Int
-  image       String?
-  description String?
-  bookings    Booking[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  image        String?
+  description  String?
+  bookings     Booking[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Booking {
@@ -53,10 +57,16 @@ model Booking {
   status          BookingStatus @default(PENDING)
   totalPrice      Int
   paymentProofUrl String?
-  expiresAt       DateTime      // Payment deadline - set to createdAt + 15 minutes
+  expiresAt       DateTime      // Payment deadline = createdAt + 15 min
 
-  user    User  @relation(fields: [userId], references: [id])
-  court   Court @relation(fields: [courtId], references: [id])
+  // Reschedule request fields
+  rescheduleDate      DateTime? // Requested new date
+  rescheduleStartTime Int?      // Requested new startTime (minutes)
+  rescheduleEndTime   Int?      // Requested new endTime (minutes)
+  rescheduleNote      String?   // Optional note from user
+
+  user    User    @relation(fields: [userId], references: [id])
+  court   Court   @relation(fields: [courtId], references: [id])
   payment Payment?
 
   createdAt DateTime @default(now())
@@ -68,12 +78,12 @@ model Booking {
 }
 
 model Payment {
-  id        String        @id @default(uuid())
-  bookingId String        @unique
+  id         String        @id @default(uuid())
+  bookingId  String        @unique
   proofImage String
-  status    PaymentStatus @default(PENDING)
+  status     PaymentStatus @default(PENDING)
 
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
