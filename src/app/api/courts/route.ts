@@ -7,17 +7,53 @@ import { getErrorMessage } from "@/lib/errorMessage";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const DEFAULT_COURTS = [
+  {
+    name: "Padel Court A (Premium)",
+    location: "Banyumanik, Semarang",
+    pricePerHour: 150000,
+    image: "/images/court-premium.jpg",
+    description: "Lapangan premium standar internasional dengan fasilitas lengkap, pencahayaan LED anti-silau, dan lantai turf berkualitas tinggi.",
+  },
+  {
+    name: "Indoor Panoramic Court",
+    location: "Tembalang, Semarang",
+    pricePerHour: 200000,
+    image: "/images/court-1.jpg",
+    description: "Lapangan indoor dengan pencahayaan panoramic modern, full enclosed glass wall, cocok untuk latihan intensif malam hari.",
+  },
+  {
+    name: "Outdoor Classic Court",
+    location: "Simpang Lima, Semarang",
+    pricePerHour: 120000,
+    image: "/images/court-2.jpg",
+    description: "Lapangan outdoor dengan suasana alami dan udara terbuka, rumput sintetis premium dengan sirkulasi udara terbaik.",
+  },
+];
+
 export async function GET() {
   console.log("API: Fetching courts...");
   try {
-    const courts = await prisma.court.findMany({
+    let courts = await prisma.court.findMany({
       orderBy: { name: "asc" },
     });
+
+    // Auto-seed if table is empty
+    if (courts.length === 0) {
+      console.log("API: Court table empty — seeding default courts...");
+      await prisma.court.createMany({
+        data: DEFAULT_COURTS,
+        skipDuplicates: true,
+      });
+      courts = await prisma.court.findMany({ orderBy: { name: "asc" } });
+      console.log(`API: Auto-seeded ${courts.length} default courts.`);
+    }
+
     console.log(`API: Found ${courts.length} courts.`);
     return NextResponse.json(courts, { status: 200 });
   } catch (error: unknown) {
     console.error("API Error [GET /api/courts]:", error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Failed to fetch courts.",
       details: getErrorMessage(error),
     }, { status: 500 });

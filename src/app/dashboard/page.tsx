@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
+import { PaymentDeadlineCountdown } from "@/components/dashboard/PaymentDeadlineCountdown";
+import { PaymentDeadlineBadge } from "@/components/dashboard/PaymentDeadlineBadge";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchJson } from "@/lib/fetchJson";
@@ -20,6 +22,7 @@ type Booking = {
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED" | string;
   totalPrice: number;
   createdAt: string;
+  expiresAt?: string;
   court?: { name?: string };
   payment?: { status?: string } | null;
 };
@@ -69,6 +72,17 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!canFetch) return;
     refresh();
+    // Auto-refresh every 10 seconds to update countdown timer and check for expiry
+    const interval = setInterval(async () => {
+      refresh();
+      // Also call check-expiry endpoint to sync expired status
+      try {
+        await fetch("/api/bookings/check-expiry", { method: "POST" });
+      } catch (e) {
+        console.error("Failed to check expiry:", e);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canFetch]);
 
@@ -122,7 +136,20 @@ export default function DashboardPage() {
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json();
         console.error("DEBUG: Upload failed response:", errorData);
-        throw new Error(errorData.error || "Gagal mengunggah file.");
+
+        if (uploadResponse.status === 410) {
+          // Booking expired
+          setToast({
+            msg:
+              errorData.error ||
+              "Waktu pembayaran telah habis. Silakan lakukan booking baru.",
+            type: "error",
+          });
+          await refresh();
+        } else {
+          throw new Error(errorData.error || "Gagal mengunggah file.");
+        }
+        return;
       }
 
       console.log("DEBUG: Upload success");
@@ -248,8 +275,24 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex flex-col items-start md:items-end gap-2">
-                    <div className="text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full bg-slate-100 text-slate-700">
-                      {b.status}
+                    <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+                      <div className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                        b.status === "CONFIRMED" ? "bg-emerald-100 text-emerald-700" :
+                        b.status === "EXPIRED" || b.status === "CANCELLED" ? "bg-red-100 text-red-700" :
+                        b.status === "PERLU_VERIFIKASI" ? "bg-amber-100 text-amber-700" :
+                        "bg-slate-100 text-slate-700"
+                      }`}>
+                        {b.status === "PERLU_VERIFIKASI" ? "Perlu Verifikasi" :
+                         b.status === "PENDING" ? "Menunggu Bayar" :
+                         b.status}
+                      </div>
+                      {b.status === "PENDING" && b.expiresAt && (
+                        <PaymentDeadlineBadge
+                          expiresAt={b.expiresAt}
+                          bookingStatus={b.status}
+                          compact={true}
+                        />
+                      )}
                     </div>
                     <div className="text-xs font-bold text-slate-500">
                       Payment:{" "}
@@ -258,29 +301,43 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {b.status === "PENDING" && !b.payment && (
-                  <div className="mt-5 grid md:grid-cols-[1fr_auto] gap-3 items-end">
-                    <Input
-                      label="Upload Bukti Pembayaran"
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        setFileByBookingId((prev) => ({
-                          ...prev,
-                          [b.id]: file,
-                        }));
-                      }}
-                    />
-                    <Button
-                      onClick={() => submitProof(b.id)}
-                      isLoading={uploadingBookingId === b.id}
-                      disabled={!fileByBookingId[b.id]}
-                    >
-                      Kirim Bukti
-                    </Button>
-                  </div>
-                )}
+                {b.status === "PENDING" && !b.payment && (() => {
+                  const isExpiredByTime = b.expiresAt ? new Date(b.expiresAt) < new Date() : false;
+                  return (
+                    <div className="mt-5 space-y-3">
+                      {b.expiresAt && (
+                        <PaymentDeadlineCountdown
+                          expiresAt={b.expiresAt}
+                          bookingStatus={b.status}
+                          onExpired={refresh}
+                        />
+                      )}
+                      {!isExpiredByTime && (
+                        <div className="grid md:grid-cols-[1fr_auto] gap-3 items-end">
+                          <Input
+                            label="Upload Bukti Pembayaran (JPG/PNG, max 2MB)"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setFileByBookingId((prev) => ({
+                                ...prev,
+                                [b.id]: file,
+                              }));
+                            }}
+                          />
+                          <Button
+                            onClick={() => submitProof(b.id)}
+                            isLoading={uploadingBookingId === b.id}
+                            disabled={!fileByBookingId[b.id]}
+                          >
+                            Kirim Bukti
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {(b.status === "PERLU_VERIFIKASI" ||
                   b.payment?.status === "PENDING") && (

@@ -78,9 +78,13 @@ export async function GET() {
     const userId = session.user.id;
     console.log(`API: Fetching for user ${userId} with role ${userRole}`);
 
-    const expirationCutoff = new Date(Date.now() - 15 * 60 * 1000);
+    // Auto-expire PENDING bookings where expiresAt < now
+    const now = new Date();
     await prisma.booking.updateMany({
-      where: { status: "PENDING", createdAt: { lt: expirationCutoff } },
+      where: {
+        status: "PENDING",
+        expiresAt: { lt: now },
+      },
       data: { status: "EXPIRED" },
     });
 
@@ -159,9 +163,10 @@ export async function POST(req: Request) {
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`,
       );
 
-      const expirationCutoff = new Date(Date.now() - 15 * 60 * 1000);
+      // Auto-expire PENDING bookings where expiresAt < now
+      const now = new Date();
       await tx.booking.updateMany({
-        where: { status: "PENDING", courtId: String(courtId), date: bookingDate, createdAt: { lt: expirationCutoff } },
+        where: { status: "PENDING", courtId: String(courtId), date: bookingDate, expiresAt: { lt: now } },
         data: { status: "EXPIRED" },
       });
 
@@ -187,6 +192,9 @@ export async function POST(req: Request) {
       const durationHours = (endTime - startTime) / 60;
       const totalPrice = court.pricePerHour * durationHours;
 
+      // Set expiresAt = now + 15 minutes
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
       const booking = await tx.booking.create({
         data: {
           userId,
@@ -196,6 +204,7 @@ export async function POST(req: Request) {
           endTime,
           status: "PENDING",
           totalPrice,
+          expiresAt,
         },
         include: {
           court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },

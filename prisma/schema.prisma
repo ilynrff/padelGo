@@ -53,6 +53,7 @@ model Booking {
   status          BookingStatus @default(PENDING)
   totalPrice      Int
   paymentProofUrl String?
+  expiresAt       DateTime      // Payment deadline - set to createdAt + 15 minutes
 
   user    User  @relation(fields: [userId], references: [id])
   court   Court @relation(fields: [courtId], references: [id])
@@ -63,6 +64,7 @@ model Booking {
 
   @@index([courtId, date])
   @@index([userId])
+  @@index([status, expiresAt])
 }
 
 model Payment {

@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     // Verify booking belongs to user
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      select: { userId: true, status: true }
+      select: { userId: true, status: true, expiresAt: true }
     });
 
     if (!booking) {
@@ -50,6 +50,16 @@ export async function POST(req: Request) {
     if (booking.userId !== userId) {
       console.warn(`DEBUG: User ${userId} attempted to upload proof for booking of user ${booking.userId}`);
       return NextResponse.json({ error: "Forbidden - Booking milik user lain" }, { status: 403 });
+    }
+
+    // Check if booking is expired
+    if (booking.status === "EXPIRED") {
+      return NextResponse.json({ error: "Booking sudah expired. Silakan lakukan booking baru." }, { status: 410 });
+    }
+
+    // Check if payment deadline has passed
+    if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
+      return NextResponse.json({ error: "Waktu pembayaran telah habis. Silakan lakukan booking baru." }, { status: 410 });
     }
 
     // 1. Write file to disk
