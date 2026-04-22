@@ -32,7 +32,7 @@ export function RescheduleModal({ booking, onClose, onSuccess, onError }: Resche
   const [note, setNote] = useState("");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // isSubmitting is derived from submitState below
 
   // Min date = 12 hours from now
   const minDate = new Date(Date.now() + 12 * 3600 * 1000).toISOString().slice(0, 10);
@@ -71,37 +71,57 @@ export function RescheduleModal({ booking, onClose, onSuccess, onError }: Resche
     if (date) fetchSlots(date);
   }, [date, fetchSlots]);
 
+  const [submitState, setSubmitState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [submitError, setSubmitError] = useState("");
+
   const handleSubmit = async () => {
     if (!date || !selectedSlot) {
-      onError("Pilih tanggal dan jam terlebih dahulu.");
+      setSubmitState("error");
+      setSubmitError("Pilih tanggal dan jam terlebih dahulu.");
       return;
     }
-    setIsSubmitting(true);
+
+    const payload = { date, timeSlot: selectedSlot, note: note || undefined };
+    console.log("[Reschedule] Submitting:", payload);
+
+    setSubmitState("loading");
+    setSubmitError("");
+
     try {
       const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, timeSlot: selectedSlot, note: note || undefined }),
+        body: JSON.stringify(payload),
       });
+
+      const responseData = await res.json();
+      console.log("[Reschedule] Response:", res.status, responseData);
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Gagal ajukan reschedule");
+        throw new Error(responseData.error || `Gagal (status ${res.status})`);
       }
-      onSuccess();
-      onClose();
+
+      // Success — show green panel briefly, then close
+      setSubmitState("success");
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 1200);
     } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : "Terjadi kesalahan");
-    } finally {
-      setIsSubmitting(false);
+      const msg = e instanceof Error ? e.message : "Terjadi kesalahan tak terduga.";
+      console.error("[Reschedule] Error:", msg);
+      setSubmitState("error");
+      setSubmitError(msg);
     }
   };
 
   const totalAvailable = slots.filter((s) => s.available).length;
+  const isSubmitting = submitState === "loading";
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-      onClick={() => !isSubmitting && onClose()}
+      onClick={() => submitState !== "loading" && submitState !== "success" && onClose()}
     >
       <div
         className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh]"
@@ -280,23 +300,51 @@ export function RescheduleModal({ booking, onClose, onSuccess, onError }: Resche
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0 bg-white rounded-b-3xl">
-          <Button
-            variant="outline"
-            className="flex-1"
-            disabled={isSubmitting}
-            onClick={onClose}
-          >
-            Batal
-          </Button>
-          <Button
-            className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50"
-            isLoading={isSubmitting}
-            disabled={!date || !selectedSlot || isSubmitting}
-            onClick={handleSubmit}
-          >
-            Kirim Permintaan
-          </Button>
+        <div className="px-6 py-4 border-t border-slate-100 shrink-0 bg-white rounded-b-3xl space-y-3">
+          {/* Success feedback */}
+          {submitState === "success" && (
+            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+              <span className="text-xl">✅</span>
+              <div>
+                <p className="text-sm font-black text-emerald-700">Permintaan Terkirim!</p>
+                <p className="text-xs text-emerald-600 font-medium">Menunggu persetujuan admin...</p>
+              </div>
+            </div>
+          )}
+          {/* Error feedback */}
+          {submitState === "error" && submitError && (
+            <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+              <span className="text-base mt-0.5">❌</span>
+              <div>
+                <p className="text-sm font-black text-red-700">Gagal Mengirim</p>
+                <p className="text-xs text-red-600 font-medium">{submitError}</p>
+              </div>
+              <button
+                onClick={() => setSubmitState("idle")}
+                className="ml-auto text-red-400 hover:text-red-600 font-bold text-xs transition-colors shrink-0"
+              >
+                Tutup
+              </button>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={isSubmitting || submitState === "success"}
+              onClick={onClose}
+            >
+              Batal
+            </Button>
+            <Button
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50"
+              isLoading={isSubmitting}
+              disabled={!date || !selectedSlot || isSubmitting || submitState === "success"}
+              onClick={handleSubmit}
+            >
+              {isSubmitting ? "Mengirim..." : "Kirim Permintaan"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

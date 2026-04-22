@@ -66,48 +66,14 @@ function parseBookingTimeRange(body: unknown) {
 }
 
 export async function GET() {
-  console.log("API: Fetching bookings...");
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      console.warn("API: Unauthorized booking fetch attempt.");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userRole = session.user.role;
     const userId = session.user.id;
-    console.log(`API: Fetching for user ${userId} with role ${userRole}`);
-
-    // Auto-expire PENDING bookings where expiresAt < now
-    const now = new Date();
-    await prisma.booking.updateMany({
-      where: {
-        status: "PENDING",
-        expiresAt: { lt: now },
-      },
-      data: { status: "EXPIRED" },
-    });
-
-    // Auto-complete CONFIRMED bookings whose end time has passed
-    // endTime is stored as minutes from midnight UTC
-    // We compare by finding bookings where date + endTime (in minutes) < now
-    const allConfirmed = await prisma.booking.findMany({
-      where: { status: "CONFIRMED" },
-      select: { id: true, date: true, endTime: true },
-    });
-    const completedIds = allConfirmed
-      .filter((b) => {
-        const endDateTime = new Date(b.date);
-        endDateTime.setUTCMinutes(endDateTime.getUTCMinutes() + b.endTime);
-        return endDateTime < now;
-      })
-      .map((b) => b.id);
-    if (completedIds.length > 0) {
-      await prisma.booking.updateMany({
-        where: { id: { in: completedIds } },
-        data: { status: "COMPLETED" },
-      });
-    }
 
     const bookings = await prisma.booking.findMany({
       where: userRole === "ADMIN" ? {} : { userId },
@@ -119,7 +85,6 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    console.log(`API: Found ${bookings.length} bookings.`);
     return NextResponse.json(bookings, { status: 200 });
   } catch (err: unknown) {
     console.error("API Error [GET /api/bookings]:", err);

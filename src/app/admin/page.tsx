@@ -6,6 +6,7 @@ import { CourtManager } from "@/components/admin/CourtManager";
 import { StatCard } from "@/components/admin/StatCard";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
+import { manageBookingLifecycle } from "@/lib/manageLifecycle";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -17,6 +18,9 @@ export default async function AdminPage() {
   if (session.user.role !== "ADMIN") {
     redirect("/");
   }
+
+  // Manage lifecycle before fetching
+  await manageBookingLifecycle();
 
   // Fetch initial data on server
   const bookings = await prisma.booking.findMany({

@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
 
   const canFetch = status === "authenticated";
+  const isInteracting = !!rescheduleBooking || !!uploadingBookingId || Object.values(fileByBookingId).some(f => !!f);
 
   // Redirect ADMIN to /admin
   useEffect(() => {
@@ -57,9 +58,12 @@ export default function DashboardPage() {
     }
   }, [session?.user?.role, router]);
 
-  const refresh = async () => {
+  const refresh = async (manageLifecycle = false) => {
     setIsLoading(true);
     try {
+      if (manageLifecycle) {
+        await fetch("/api/bookings/expire", { method: "POST" });
+      }
       const data = await fetchJson<Booking[]>("/api/bookings");
       setBookings(Array.isArray(data) ? data : []);
     } catch (e: unknown) {
@@ -72,13 +76,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!canFetch) return;
-    refresh();
+    refresh(true); // Manage lifecycle on initial load
     const interval = setInterval(() => {
-      refresh();
+      if (!isInteracting && !isLoading) {
+        refresh(false); // Just fetch data periodically, don't manage lifecycle every time
+      }
     }, 30000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canFetch]);
+  }, [canFetch, isInteracting]);
 
   const pending = useMemo(
     () => bookings.filter((b) => b.status === "PENDING").length,

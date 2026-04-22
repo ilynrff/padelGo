@@ -18,8 +18,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (booking.userId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (!["CONFIRMED"].includes(booking.status)) {
-      return NextResponse.json({ error: "Reschedule hanya bisa untuk booking yang sudah CONFIRMED" }, { status: 400 });
+    if (booking.status !== "CONFIRMED") {
+      const msg = booking.status === "RESCHEDULE_APPROVED" 
+        ? "Booking ini sudah pernah di-reschedule (hanya boleh 1x)."
+        : "Reschedule hanya bisa untuk booking yang sudah CONFIRMED.";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
 
     // Check 12-hour rule
@@ -91,27 +94,34 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         return NextResponse.json({ error: "Data reschedule tidak lengkap" }, { status: 400 });
       }
 
-      // Check no conflict on the new slot
+      // 1. RE-VERIFY conflict on the new slot right before approval
       const conflict = await prisma.booking.findFirst({
         where: {
           id: { not: booking.id },
           courtId: booking.courtId,
           date: booking.rescheduleDate,
-          status: { in: ["PENDING", "CONFIRMED", "RESCHEDULE_APPROVED"] },
+          // Block if any of these statuses already occupy the slot
+          status: { in: ["PENDING", "CONFIRMED", "PERLU_VERIFIKASI", "RESCHEDULE_REQUESTED", "RESCHEDULE_APPROVED"] },
           AND: [
             { startTime: { lt: booking.rescheduleEndTime } },
             { endTime: { gt: booking.rescheduleStartTime } },
           ],
         },
       });
+
       if (conflict) {
-        return NextResponse.json({ error: "Slot baru sudah terisi. Pilih jam lain." }, { status: 409 });
+        return NextResponse.json({ error: "Slot baru sudah terisi oleh booking lain. Reschedule gagal." }, { status: 409 });
       }
+
+      console.log(`[Reschedule] Approving booking ${params.id}:`, {
+        old: { date: booking.date, start: booking.startTime, end: booking.endTime },
+        new: { date: booking.rescheduleDate, start: booking.rescheduleStartTime, end: booking.rescheduleEndTime }
+      });
 
       const updated = await prisma.booking.update({
         where: { id: params.id },
         data: {
-          status: "RESCHEDULE_APPROVED",
+          status: "RESCHEDULE_APPROVED", // Keep as APPROVED to prevent further reschedules
           date: booking.rescheduleDate,
           startTime: booking.rescheduleStartTime,
           endTime: booking.rescheduleEndTime,
