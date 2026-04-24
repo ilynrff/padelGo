@@ -26,7 +26,7 @@ type Booking = {
   payment?: { status?: string; proofImage?: string } | null;
 };
 
-type Props = { initialBookings?: Booking[]; isLoading?: boolean };
+type Props = { initialBookings?: Booking[]; isLoading?: boolean; defaultFilter?: string };
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   PENDING:               { label: "Menunggu Bayar",     bg: "bg-orange-100", text: "text-orange-700" },
@@ -62,10 +62,10 @@ function CourtAvailTag({ booking }: { booking: Booking }) {
   return <span className="text-[11px] font-medium text-slate-400">Selesai</span>;
 }
 
-export function BookingManager({ initialBookings = [], isLoading = false }: Props) {
+export function BookingManager({ initialBookings = [], isLoading = false, defaultFilter }: Props) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(defaultFilter ?? "all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [selected, setSelected] = useState<Booking | null>(null);
