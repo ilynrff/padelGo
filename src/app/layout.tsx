@@ -7,7 +7,7 @@ import { NextAuthProvider } from "@/components/NextAuthProvider";
 const inter = Inter({ subsets: ["latin"], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: "PadelX - Premium Booking System",
+  title: "PadelGo - Premium Booking System",
   description: "Book your padel courts efficiently.",
 };
 
