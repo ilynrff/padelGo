@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
+import { CalendarView } from "@/components/booking/CalendarView";
 
 type Slot = { time: string; available: boolean };
 
@@ -157,12 +158,17 @@ export function RescheduleModal({ booking, onClose, onSuccess, onError }: Resche
 
           {/* Date picker */}
           <div>
-            <Input
-              label="Tanggal Baru"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              min={minDate}
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+              Pilih Tanggal Baru
+            </p>
+            <CalendarView 
+              selectedDate={date ? new Date(date + "T00:00:00Z") : null}
+              onSelectDate={(newD) => {
+                const isoStr = newD.toISOString().split("T")[0];
+                setDate(isoStr);
+                setSelectedSlot(null);
+              }}
+              courtId={booking.courtId}
             />
           </div>
 

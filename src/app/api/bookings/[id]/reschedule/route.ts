@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { coerceDateOnlyUTC, parseSlotToRange } from "@/lib/bookingTime";
+import { validateBookingMonth } from "@/lib/dateValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const body = (await req.json()) as Record<string, unknown>;
     const newDate = coerceDateOnlyUTC(String(body.date ?? ""));
     if (!newDate) return NextResponse.json({ error: "Tanggal baru tidak valid (format YYYY-MM-DD)" }, { status: 400 });
+
+    const monthValidation = validateBookingMonth(newDate);
+    if (!monthValidation.valid) {
+      return NextResponse.json({ error: monthValidation.error }, { status: 400 });
+    }
 
     let rescheduleStartTime: number;
     let rescheduleEndTime: number;

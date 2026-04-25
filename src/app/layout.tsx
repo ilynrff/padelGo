@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ["latin"], display: 'swap' });
 export const metadata: Metadata = {
   title: "PadelGo - Premium Booking System",
   description: "Book your padel courts efficiently.",
+  icons: {
+    icon: "/images/tennis-balls.png"
+  }
 };
 
 export default function RootLayout({
@@ -19,12 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50 text-slate-900`}>
-          <NextAuthProvider>
-            <Navbar />
-            <main className="flex-1 w-full flex flex-col">
-              {children}
-            </main>
-          </NextAuthProvider>
+        <NextAuthProvider>
+          <Navbar />
+          <main className="flex-1 w-full flex flex-col">
+            {children}
+          </main>
+        </NextAuthProvider>
       </body>
     </html>
   );

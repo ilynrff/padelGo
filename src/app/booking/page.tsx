@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
+import { CalendarView } from "@/components/booking/CalendarView";
 
 export default function BookingPage() {
   const { data: session } = useSession();
@@ -18,7 +19,6 @@ export default function BookingPage() {
     courts,
     timeSlots,
     isLoadingSlots,
-    dates,
     selectedCourt,
     setSelectedCourt,
     selectedDate,
@@ -329,40 +329,23 @@ export default function BookingPage() {
                   Pilih Tanggal
                 </h2>
               </div>
-              <div className="flex overflow-x-auto gap-3 pt-3 pb-6 px-2 -mx-2 snap-x hide-scrollbar">
-                {dates.map((d, idx) => {
-                  const dayStr = d.toLocaleDateString("id-ID", {
-                    weekday: "short",
-                  });
-                  const dateNum = d.getDate();
-                  const isSelected =
-                    selectedDate?.toDateString() === d.toDateString();
 
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSelectedDate(d);
-                        setSelectedSlots([]);
-                      }}
-                      className={`flex-shrink-0 snap-start flex flex-col items-center justify-center w-[84px] h-[100px] rounded-3xl border-2 transition-all duration-200 active:scale-95 ${
-                        selectedDate.toDateString() === d.toDateString()
-                          ? "bg-slate-900 border-slate-900 text-white shadow-[0_10px_20px_-8px_rgba(0,0,0,0.5)] transform -translate-y-1"
-                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:shadow-md hover:-translate-y-1"
-                      }`}
-                    >
-                      <span
-                        className={`text-xs font-bold uppercase tracking-widest ${isSelected ? "text-slate-300" : "text-slate-400"}`}
-                      >
-                        {dayStr}
-                      </span>
-                      <span className="text-3xl font-black mt-1 text-current">
-                        {dateNum}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {!selectedCourt ? (
+                <div className="p-8 border-2 border-dashed border-slate-200 rounded-3xl text-center bg-white/50">
+                  <p className="text-slate-400 font-bold">
+                    Pilih lapangan untuk melihat ketersediaan kalender.
+                  </p>
+                </div>
+              ) : (
+                <CalendarView
+                  selectedDate={selectedDate}
+                  onSelectDate={(date) => {
+                    setSelectedDate(date);
+                    setSelectedSlots([]);
+                  }}
+                  courtId={selectedCourt}
+                />
+              )}
             </div>
 
             {/* 3. Time Slots */}

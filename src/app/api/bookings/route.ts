@@ -11,6 +11,7 @@ import {
   coerceDateOnlyUTC,
 } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { validateBookingMonth } from "@/lib/dateValidation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -121,6 +122,11 @@ export async function POST(req: Request) {
     const bookingDate = coerceDateOnlyUTC(String(date));
     if (!bookingDate) {
       return NextResponse.json({ error: "Invalid date. Use YYYY-MM-DD." }, { status: 400 });
+    }
+
+    const monthValidation = validateBookingMonth(bookingDate);
+    if (!monthValidation.valid) {
+      return NextResponse.json({ error: monthValidation.error }, { status: 400 });
     }
 
     const parsed = parseBookingTimeRange(payload);
