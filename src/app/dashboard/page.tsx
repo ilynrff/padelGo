@@ -17,6 +17,7 @@ import { fetchJson } from "@/lib/fetchJson";
 
 type Booking = {
   id: string;
+  bookingCode?: string | null;
   date: string;
   startTime: number;
   endTime: number;
@@ -36,7 +37,201 @@ type Booking = {
   expiresAt?: string;
   court?: { id?: string; name?: string };
   payment?: { status?: string } | null;
+  bookingCode?: string | null;
 };
+
+import React from "react";
+
+const BookingRow = React.memo(({ 
+  b, 
+  file, 
+  onFileChange, 
+  onUpload, 
+  isUploading, 
+  onReschedule 
+}: { 
+  b: Booking, 
+  file: File | null, 
+  onFileChange: (f: File | null) => void, 
+  onUpload: () => void, 
+  isUploading: boolean,
+  onReschedule: (b: Booking) => void
+}) => {
+  const bookingStart = new Date(b.date);
+  bookingStart.setUTCMinutes(bookingStart.getUTCMinutes() + b.startTime);
+  const hoursUntil = (bookingStart.getTime() - Date.now()) / 3600000;
+  const canReschedule = hoursUntil > 12;
+  const isExpiredByTime = b.expiresAt ? new Date(b.expiresAt) < new Date() : false;
+
+  return (
+    <Card className="p-6 rounded-[2rem] border-slate-100 shadow-sm overflow-hidden">
+      {/* Header row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+            {b.bookingCode || b.id.slice(0, 8)}
+          </div>
+          <div className="text-sm font-black text-slate-900">{b.court?.name}</div>
+          <div className="text-sm font-bold text-slate-500">
+            {String(b.date).slice(0, 10)} •{" "}
+            {formatMinutesToHHmm(b.startTime)} – {formatMinutesToHHmm(b.endTime)}
+          </div>
+          <div className="text-sm font-bold text-slate-500">
+            Total:{" "}
+            <span className="text-slate-900">
+              Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start md:items-end gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+            <div className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+              b.status === "CONFIRMED" || b.status === "RESCHEDULE_APPROVED"
+                ? "bg-emerald-100 text-emerald-700"
+                : b.status === "EXPIRED" || b.status === "CANCELLED"
+                  ? "bg-red-100 text-red-700"
+                  : b.status === "PERLU_VERIFIKASI"
+                    ? "bg-amber-100 text-amber-700"
+                    : b.status === "RESCHEDULE_REQUESTED"
+                      ? "bg-violet-100 text-violet-700"
+                      : b.status === "RESCHEDULE_REJECTED"
+                        ? "bg-rose-100 text-rose-700"
+                        : b.status === "COMPLETED"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-slate-100 text-slate-700"
+            }`}>
+              {b.status === "PERLU_VERIFIKASI" ? "Perlu Verifikasi"
+                : b.status === "PENDING" ? "Menunggu Bayar"
+                : b.status === "RESCHEDULE_REQUESTED" ? "Reschedule ⏳"
+                : b.status === "RESCHEDULE_APPROVED" ? "Reschedule ✓"
+                : b.status === "RESCHEDULE_REJECTED" ? "Reschedule ✕"
+                : b.status}
+            </div>
+            {b.status === "PENDING" && b.expiresAt && (
+              <PaymentDeadlineBadge
+                expiresAt={b.expiresAt}
+                bookingStatus={b.status}
+                compact={true}
+              />
+            )}
+          </div>
+          <div className="text-xs font-bold text-slate-500">
+            Payment: {b.payment?.status ?? "NOT_SUBMITTED"}
+          </div>
+        </div>
+      </div>
+
+      {/* PENDING: payment deadline + file upload */}
+      {b.status === "PENDING" && !b.payment && (
+        <div className="mt-5 space-y-3">
+          {b.expiresAt && (
+            <PaymentDeadlineCountdown
+              expiresAt={b.expiresAt}
+              bookingStatus={b.status}
+              onExpired={() => {}} // Handle at parent level if needed
+            />
+          )}
+          {!isExpiredByTime && (
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                onUpload();
+              }}
+              className="grid md:grid-cols-[1fr_auto] gap-3 items-end"
+            >
+              <div className="relative group">
+                {file ? (
+                  <div className="flex items-center justify-between bg-blue-50 border-2 border-blue-100 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <span className="text-xl shrink-0">📄</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">File terpilih</p>
+                        <p className="text-sm font-bold text-blue-700 truncate">{file.name}</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => onFileChange(null)}
+                      className="ml-2 text-blue-400 hover:text-red-500 font-bold transition-colors"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : (
+                  <Input
+                    label="Upload Bukti Pembayaran (JPG/PNG, max 2MB)"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      onFileChange(f);
+                    }}
+                  />
+                )}
+              </div>
+              <Button
+                type="submit"
+                isLoading={isUploading}
+                disabled={!file}
+              >
+                Kirim Bukti
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* PERLU VERIFIKASI */}
+      {(b.status === "PERLU_VERIFIKASI" || b.payment?.status === "PENDING") && (
+        <div className="mt-4 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+          <span className="text-xl">⏳</span>
+          <span>Bukti pembayaran sudah dikirim. Menunggu verifikasi admin.</span>
+        </div>
+      )}
+
+      {/* CONFIRMED: reschedule button */}
+      {b.status === "CONFIRMED" && (
+        <div className="mt-4">
+          <button
+            onClick={() => onReschedule(b)}
+            disabled={!canReschedule}
+            title={!canReschedule ? "Hanya bisa reschedule > 12 jam sebelum jadwal" : ""}
+            className="text-sm font-bold text-violet-600 border border-violet-200 bg-violet-50 hover:bg-violet-100 rounded-xl px-4 py-2 w-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            📅 Ajukan Reschedule{!canReschedule && " (< 12 jam)"}
+          </button>
+        </div>
+      )}
+
+      {/* Reschedule status messages */}
+      {b.status === "RESCHEDULE_REQUESTED" && (
+        <div className="mt-4 text-sm font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-2xl p-4">
+          ⏳ Permintaan reschedule sedang menunggu persetujuan admin.
+        </div>
+      )}
+      {b.status === "RESCHEDULE_APPROVED" && (
+        <div className="mt-4 text-sm font-bold text-teal-700 bg-teal-50 border border-teal-200 rounded-2xl p-4">
+          ✅ Reschedule disetujui! Jadwal baru sudah aktif.
+        </div>
+      )}
+      {b.status === "RESCHEDULE_REJECTED" && (
+        <div className="mt-4 text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl p-4">
+          ❌ Reschedule ditolak admin. Jadwal lama tetap berlaku.
+        </div>
+      )}
+
+      {/* EXPIRED / CANCELLED */}
+      {(b.status === "EXPIRED" || b.status === "CANCELLED") && (
+        <div className="mt-4 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-2xl p-4">
+          Booking {b.status.toLowerCase()}. Silakan booking ulang.
+        </div>
+      )}
+    </Card>
+  );
+});
+
+BookingRow.displayName = "BookingRow";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -58,8 +253,8 @@ export default function DashboardPage() {
     }
   }, [session?.user?.role, router]);
 
-  const refresh = async (manageLifecycle = false) => {
-    setIsLoading(true);
+  const refresh = async (manageLifecycle = false, silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       if (manageLifecycle) {
         await fetch("/api/bookings/expire", { method: "POST" });
@@ -79,7 +274,7 @@ export default function DashboardPage() {
     refresh(true); // Manage lifecycle on initial load
     const interval = setInterval(() => {
       if (!isInteracting && !isLoading) {
-        refresh(false); // Just fetch data periodically, don't manage lifecycle every time
+        refresh(false, true); // Silent refresh in background
       }
     }, 30000);
     return () => clearInterval(interval);
@@ -137,7 +332,7 @@ export default function DashboardPage() {
 
       setToast({ msg: "Bukti pembayaran terkirim. Menunggu verifikasi admin.", type: "success" });
       setFileByBookingId((prev) => ({ ...prev, [bookingId]: null }));
-      await refresh();
+      await refresh(false, true); // Silent refresh to update status
     } catch (e: unknown) {
       setToast({ msg: getErrorMessage(e) || "Terjadi kesalahan", type: "error" });
     } finally {
@@ -214,149 +409,17 @@ export default function DashboardPage() {
               Belum ada booking.
             </div>
           ) : (
-            bookings.map((b) => {
-              const bookingStart = new Date(b.date);
-              bookingStart.setUTCMinutes(bookingStart.getUTCMinutes() + b.startTime);
-              const hoursUntil = (bookingStart.getTime() - Date.now()) / 3600000;
-              const canReschedule = hoursUntil > 12;
-              const isExpiredByTime = b.expiresAt ? new Date(b.expiresAt) < new Date() : false;
-
-              return (
-                <Card key={b.id} className="p-6 rounded-[2rem] border-slate-100 shadow-sm">
-                  {/* Header row */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="text-sm font-black text-slate-900">{b.court?.name}</div>
-                      <div className="text-sm font-bold text-slate-500">
-                        {String(b.date).slice(0, 10)} •{" "}
-                        {formatMinutesToHHmm(b.startTime)} – {formatMinutesToHHmm(b.endTime)}
-                      </div>
-                      <div className="text-sm font-bold text-slate-500">
-                        Total:{" "}
-                        <span className="text-slate-900">
-                          Rp {Number(b.totalPrice || 0).toLocaleString("id-ID")}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-start md:items-end gap-2">
-                      <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
-                        <div className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                          b.status === "CONFIRMED" || b.status === "RESCHEDULE_APPROVED"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : b.status === "EXPIRED" || b.status === "CANCELLED"
-                              ? "bg-red-100 text-red-700"
-                              : b.status === "PERLU_VERIFIKASI"
-                                ? "bg-amber-100 text-amber-700"
-                                : b.status === "RESCHEDULE_REQUESTED"
-                                  ? "bg-violet-100 text-violet-700"
-                                  : b.status === "RESCHEDULE_REJECTED"
-                                    ? "bg-rose-100 text-rose-700"
-                                    : b.status === "COMPLETED"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-slate-100 text-slate-700"
-                        }`}>
-                          {b.status === "PERLU_VERIFIKASI" ? "Perlu Verifikasi"
-                            : b.status === "PENDING" ? "Menunggu Bayar"
-                            : b.status === "RESCHEDULE_REQUESTED" ? "Reschedule ⏳"
-                            : b.status === "RESCHEDULE_APPROVED" ? "Reschedule ✓"
-                            : b.status === "RESCHEDULE_REJECTED" ? "Reschedule ✕"
-                            : b.status}
-                        </div>
-                        {b.status === "PENDING" && b.expiresAt && (
-                          <PaymentDeadlineBadge
-                            expiresAt={b.expiresAt}
-                            bookingStatus={b.status}
-                            compact={true}
-                          />
-                        )}
-                      </div>
-                      <div className="text-xs font-bold text-slate-500">
-                        Payment: {b.payment?.status ?? "NOT_SUBMITTED"}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PENDING: payment deadline + file upload */}
-                  {b.status === "PENDING" && !b.payment && (
-                    <div className="mt-5 space-y-3">
-                      {b.expiresAt && (
-                        <PaymentDeadlineCountdown
-                          expiresAt={b.expiresAt}
-                          bookingStatus={b.status}
-                          onExpired={refresh}
-                        />
-                      )}
-                      {!isExpiredByTime && (
-                        <div className="grid md:grid-cols-[1fr_auto] gap-3 items-end">
-                          <Input
-                            label="Upload Bukti Pembayaran (JPG/PNG, max 2MB)"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              setFileByBookingId((prev) => ({ ...prev, [b.id]: file }));
-                            }}
-                          />
-                          <Button
-                            onClick={() => submitProof(b.id)}
-                            isLoading={uploadingBookingId === b.id}
-                            disabled={!fileByBookingId[b.id]}
-                          >
-                            Kirim Bukti
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* PERLU VERIFIKASI */}
-                  {(b.status === "PERLU_VERIFIKASI" || b.payment?.status === "PENDING") && (
-                    <div className="mt-4 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                      Bukti pembayaran sudah dikirim. Menunggu verifikasi admin.
-                    </div>
-                  )}
-
-                  {/* CONFIRMED: reschedule button */}
-                  {b.status === "CONFIRMED" && (
-                    <div className="mt-4">
-                      <button
-                        onClick={() => setRescheduleBooking(b)}
-                        disabled={!canReschedule}
-                        title={!canReschedule ? "Hanya bisa reschedule > 12 jam sebelum jadwal" : ""}
-                        className="text-sm font-bold text-violet-600 border border-violet-200 bg-violet-50 hover:bg-violet-100 rounded-xl px-4 py-2 w-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        📅 Ajukan Reschedule{!canReschedule && " (< 12 jam)"}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Reschedule status messages */}
-                  {b.status === "RESCHEDULE_REQUESTED" && (
-                    <div className="mt-4 text-sm font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-2xl p-4">
-                      ⏳ Permintaan reschedule sedang menunggu persetujuan admin.
-                    </div>
-                  )}
-                  {b.status === "RESCHEDULE_APPROVED" && (
-                    <div className="mt-4 text-sm font-bold text-teal-700 bg-teal-50 border border-teal-200 rounded-2xl p-4">
-                      ✅ Reschedule disetujui! Jadwal baru sudah aktif.
-                    </div>
-                  )}
-                  {b.status === "RESCHEDULE_REJECTED" && (
-                    <div className="mt-4 text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl p-4">
-                      ❌ Reschedule ditolak admin. Jadwal lama tetap berlaku.
-                    </div>
-                  )}
-
-                  {/* EXPIRED / CANCELLED */}
-                  {(b.status === "EXPIRED" || b.status === "CANCELLED") && (
-                    <div className="mt-4 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-2xl p-4">
-                      Booking {b.status.toLowerCase()}. Silakan booking ulang.
-                    </div>
-                  )}
-                </Card>
-              );
-            })
+            bookings.map((b) => (
+              <BookingRow
+                key={b.id}
+                b={b}
+                file={fileByBookingId[b.id] || null}
+                onFileChange={(f) => setFileByBookingId(prev => ({ ...prev, [b.id]: f }))}
+                onUpload={() => submitProof(b.id)}
+                isUploading={uploadingBookingId === b.id}
+                onReschedule={setRescheduleBooking}
+              />
+            ))
           )}
         </div>
       </div>

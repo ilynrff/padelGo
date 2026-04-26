@@ -49,6 +49,7 @@ model Court {
 
 model Booking {
   id              String        @id @default(uuid())
+  bookingCode     String?       @unique
   userId          String
   courtId         String
   date            DateTime

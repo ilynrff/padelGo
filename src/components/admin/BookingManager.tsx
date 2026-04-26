@@ -9,6 +9,7 @@ import { fetchJson } from "@/lib/fetchJson";
 
 type Booking = {
   id: string;
+  bookingCode?: string | null;
   date: string;
   startTime: number;
   endTime: number;
@@ -124,6 +125,7 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((b) =>
+        (b.bookingCode || "").toLowerCase().includes(q) ||
         b.id.toLowerCase().includes(q) ||
         (b.user?.name ?? "").toLowerCase().includes(q) ||
         (b.court?.name ?? "").toLowerCase().includes(q),
@@ -189,6 +191,10 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
               <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
                 {b.user?.name ?? "—"}
               </div>
+              {/* Booking Code */}
+              <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                {b.bookingCode || "OLD DATA"}
+              </div>
               {/* Date & time */}
               <div className="text-xs font-bold text-slate-700">
                 {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
@@ -223,8 +229,8 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-slate-100 px-6 pt-5 pb-4 flex justify-between items-start rounded-t-3xl">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Booking Detail</p>
-                <h3 className="text-lg font-black text-slate-900">{String(selected.id).slice(0, 12)}…</h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detail Booking</p>
+                <h3 className="text-lg font-black text-slate-900">{selected.bookingCode || selected.id}</h3>
               </div>
               <button onClick={() => setSelected(null)}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold flex items-center justify-center">
@@ -236,6 +242,7 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
               {/* Info rows */}
               <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
                 {[
+                  ["Kode", selected.bookingCode || "—"],
                   ["Court", selected.court?.name ?? "—"],
                   ["Lokasi", selected.court?.location ?? "—"],
                   ["User", selected.user?.name ?? "—"],

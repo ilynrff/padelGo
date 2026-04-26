@@ -77,8 +77,9 @@ export default function BookingPage() {
     }
   };
 
-  const executeCheckout = () => {
-    setShowConfirmModal(false);
+  const executeCheckout = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isLoading) return; // Prevent double trigger
     checkout();
   };
 
@@ -106,7 +107,10 @@ export default function BookingPage() {
 
       {showConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+          <form 
+            onSubmit={executeCheckout} 
+            className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200"
+          >
             <h3 className="text-2xl font-black text-slate-900 mb-2">
               Konfirmasi Booking
             </h3>
@@ -164,14 +168,15 @@ export default function BookingPage() {
                 Batal
               </Button>
               <Button
+                type="submit"
                 className="w-full"
-                onClick={executeCheckout}
                 isLoading={isLoading}
+                disabled={isLoading}
               >
                 {isLoading ? "Memproses..." : "Ya, Bayar Sekarang"}
               </Button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 

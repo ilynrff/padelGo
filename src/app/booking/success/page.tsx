@@ -10,6 +10,7 @@ import { fetchJson } from "@/lib/fetchJson";
 
 type Booking = {
   id: string;
+  bookingCode: string;
   date: string;
   startTime: number;
   endTime: number;
@@ -62,8 +63,8 @@ function SuccessContent() {
       {data && (
         <div className="bg-slate-50 rounded-2xl p-6 text-left space-y-4 mb-8 shadow-inner border border-slate-100">
           <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Booking ID</span>
-            <span className="text-sm font-black text-slate-900">{data.id}</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Kode Booking</span>
+            <span className="text-sm font-black text-slate-900">{data.bookingCode || data.id}</span>
           </div>
           <div className="flex justify-between items-center border-b border-slate-200 pb-3">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Lapangan</span>

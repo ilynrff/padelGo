@@ -184,11 +184,26 @@ export async function POST(req: Request) {
       const durationHours = (endTime - startTime) / 60;
       const totalPrice = court.pricePerHour * durationHours;
 
+      // Generate bookingCode: PDL-YYYY-NNNN
+      const year = new Date().getFullYear();
+      const count = await tx.booking.count({
+        where: {
+          createdAt: {
+            gte: new Date(`${year}-01-01`),
+            lt: new Date(`${year + 1}-01-01`),
+          },
+        },
+      });
+      const sequence = String(count + 1).padStart(4, "0");
+      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+      const bookingCode = `PDL-${year}-${sequence}-${randomSuffix}`;
+
       // Set expiresAt = now + 15 minutes
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
       const booking = await tx.booking.create({
         data: {
+          bookingCode,
           userId,
           courtId: String(courtId),
           date: bookingDate,

@@ -7,6 +7,7 @@ import { CourtSchedule } from "./CourtSchedule";
 
 type Booking = {
   id: string;
+  bookingCode?: string | null;
   date: string;
   startTime: number;
   endTime: number;
