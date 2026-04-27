@@ -71,12 +71,25 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [selected, setSelected] = useState<Booking | null>(null);
+  
+  // New Filter & Search states
+  const [dateFilter, setDateFilter] = useState<string>("");
+  const [serverSearchCode, setServerSearchCode] = useState("");
+  const [searchedBooking, setSearchedBooking] = useState<Booking | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastQueue, setToastQueue] = useState<{ msg: string; type: "success" | "error" }[]>([]);
 
   useEffect(() => { setBookings(initialBookings); }, [initialBookings]);
 
+  // Effect to re-fetch when dateFilter changes
+  useEffect(() => {
+    refresh();
+  }, [dateFilter]);
+
   const showToast = (msg: string, type: "success" | "error") => {
+
     setToastQueue((q) => [...q, { msg, type }]);
     setTimeout(() => setToastQueue((q) => q.slice(1)), 3500);
   };
@@ -84,7 +97,8 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
   const refresh = async () => {
     setIsRefreshing(true);
     try {
-      const data = await fetchJson<Booking[]>("/api/bookings");
+      const url = dateFilter ? `/api/bookings?date=${dateFilter}` : "/api/bookings";
+      const data = await fetchJson<Booking[]>(url);
       setBookings(Array.isArray(data) ? data : []);
     } catch (e) { showToast(getErrorMessage(e) || "Error", "error"); }
     finally { setIsRefreshing(false); }
@@ -140,6 +154,41 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
     finally { setIsProcessing(false); }
   };
 
+  const handleSearchByCode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!serverSearchCode.trim()) return;
+    
+    setIsSearching(true);
+    setSearchError("");
+    setSearchedBooking(null);
+    
+    try {
+      const data = await fetchJson<Booking>(`/api/admin/bookings/search?code=${serverSearchCode}`);
+      setSearchedBooking(data);
+    } catch (e: any) {
+      setSearchError("Booking tidak ditemukan");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setServerSearchCode("");
+    setSearchedBooking(null);
+    setSearchError("");
+  };
+
+  const getTodayStr = () => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  };
+
+  const getTomorrowStr = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  };
+
   const filtered = useMemo(() => {
     let list = bookings.slice();
     if (filter !== "all") list = list.filter((b) => b.status.toUpperCase() === filter);
@@ -166,82 +215,193 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
         {toastQueue.map((t, i) => <Toast key={i} isOpen message={t.msg} type={t.type} onClose={() => {}} />)}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <input
-          type="text" placeholder="Cari user / court…"
-          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1 min-w-[160px]"
-          value={search} onChange={(e) => setSearch(e.target.value)}
-        />
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
-          <option value="all">Semua</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value as "desc" | "asc")}
-          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
-          <option value="desc">Terbaru</option>
-          <option value="asc">Terlama</option>
-        </select>
-        <Button variant="outline" onClick={refresh} isLoading={isRefreshing} className="shrink-0 text-sm">
-          ↻ Refresh
-        </Button>
-      </div>
-
-      {/* Card Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {isLoading && [1,2,3].map(i => (
-          <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse h-40"/>
-        ))}
-        {!isLoading && filtered.length === 0 && (
-          <div className="sm:col-span-2 xl:col-span-3 bg-white rounded-2xl p-8 text-center text-slate-400 font-bold border border-slate-100">
-            Tidak ada data.
-          </div>
+      {/* Global Search By Code */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-3">Cari Kode Booking</h3>
+        <form onSubmit={handleSearchByCode} className="flex gap-2">
+          <input
+            type="text" 
+            placeholder="Masukkan kode booking (contoh: PDL-2026-0001)"
+            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+            value={serverSearchCode} 
+            onChange={(e) => setServerSearchCode(e.target.value)}
+          />
+          <Button type="submit" isLoading={isSearching} disabled={!serverSearchCode.trim()}>
+            Cari
+          </Button>
+          {searchedBooking && (
+            <Button variant="outline" type="button" onClick={handleClearSearch}>
+              Clear
+            </Button>
+          )}
+        </form>
+        {searchError && (
+          <p className="mt-3 text-sm font-bold text-red-600 flex items-center gap-2">
+            ⚠️ {searchError}
+          </p>
         )}
-        {(!isLoading ? filtered : []).map((b) => (
-          <div key={b.id}
-            className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col">
-            {/* Court image strip */}
-            <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-400" />
-            <div className="p-4 flex-1 space-y-2">
-              {/* Court name */}
-              <div className="font-black text-slate-900 text-sm truncate" title={b.court?.name ?? "—"}>
-                {b.court?.name ?? "—"}
-              </div>
-              {/* User */}
-              <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
-                {b.user?.name ?? "—"}
-              </div>
-              {/* Booking Code */}
-              <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                {b.bookingCode || "OLD DATA"}
-              </div>
-              {/* Date & time */}
-              <div className="text-xs font-bold text-slate-700">
-                {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
-              </div>
-              {/* Price */}
-              <div className="text-sm font-black text-blue-700">
-                Rp {Number(b.totalPrice ?? 0).toLocaleString("id-ID")}
-              </div>
-              {/* Status row */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusPill status={b.status} />
-                <CourtAvailTag booking={b} />
-              </div>
-            </div>
-            {/* Footer */}
-            <div className="border-t border-slate-100 px-4 py-3">
-              <button onClick={() => setSelected(b)}
-                className="w-full text-xs font-black text-blue-600 border border-blue-200 rounded-xl py-2 hover:bg-blue-50 active:scale-95 transition-all">
-                Lihat Detail
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
 
-      {/* Detail Drawer / Modal */}
+      {/* Search Result Override */}
+      {searchedBooking ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black text-slate-800">Hasil Pencarian</h2>
+            <button onClick={handleClearSearch} className="text-sm font-bold text-slate-500 hover:text-slate-800 underline">
+              Kembali ke Daftar
+            </button>
+          </div>
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-blue-600 text-white px-4 py-1 rounded-bl-xl text-xs font-black uppercase tracking-widest">
+              Matched
+            </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-3xl font-black text-blue-900 tracking-tight">{searchedBooking.bookingCode || searchedBooking.id.slice(0, 8)}</p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <StatusPill status={searchedBooking.status} />
+                  <span className="text-sm font-bold text-slate-600">
+                    {String(searchedBooking.date).slice(0, 10)} • {formatMinutesToHHmm(searchedBooking.startTime)} - {formatMinutesToHHmm(searchedBooking.endTime)}
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-slate-700">
+                  👤 {searchedBooking.user?.name} | 🎾 {searchedBooking.court?.name}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {["CONFIRMED", "RESCHEDULE_APPROVED"].includes(searchedBooking.status) && (
+                  <Button 
+                    onClick={async () => {
+                      await checkIn(searchedBooking.bookingCode || "");
+                      handleSearchByCode(); // Refresh the search result
+                    }}
+                    isLoading={isProcessing}
+                    className="shadow-md bg-blue-600 hover:bg-blue-700"
+                  >
+                    📍 Confirm Check-in
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelected(searchedBooking)}>
+                  Lihat Detail Penuh
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            {/* Date Filters */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest mr-2">Filter Tanggal:</span>
+              <button 
+                onClick={() => setDateFilter("")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${dateFilter === "" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                Semua
+              </button>
+              <button 
+                onClick={() => setDateFilter(getTodayStr())}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${dateFilter === getTodayStr() ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                Hari Ini
+              </button>
+              <button 
+                onClick={() => setDateFilter(getTomorrowStr())}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${dateFilter === getTomorrowStr() ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                Besok
+              </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <input 
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+
+            {/* Existing List Filters */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                type="text" placeholder="Cari user / court…"
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1 min-w-[160px]"
+                value={search} onChange={(e) => setSearch(e.target.value)}
+              />
+              <select value={filter} onChange={(e) => setFilter(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
+                <option value="all">Semua</option>
+                {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select value={sort} onChange={(e) => setSort(e.target.value as "desc" | "asc")}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
+                <option value="desc">Terbaru</option>
+                <option value="asc">Terlama</option>
+              </select>
+              <Button variant="outline" onClick={() => refresh()} isLoading={isRefreshing} className="shrink-0 text-sm">
+                ↻ Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Card Grid */}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {isLoading && [1,2,3].map(i => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse h-40"/>
+            ))}
+            {!isLoading && filtered.length === 0 && (
+              <div className="sm:col-span-2 xl:col-span-3 bg-white rounded-2xl p-8 text-center text-slate-400 font-bold border border-slate-100">
+                Belum ada booking.
+              </div>
+            )}
+            {!isLoading && filtered.map((b) => (
+              <div key={b.id}
+                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col">
+                {/* Court image strip */}
+                <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-400" />
+                <div className="p-4 flex-1 space-y-2">
+                  {/* Court name */}
+                  <div className="font-black text-slate-900 text-sm truncate" title={b.court?.name ?? "—"}>
+                    {b.court?.name ?? "—"}
+                  </div>
+                  {/* User */}
+                  <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
+                    {b.user?.name ?? "—"}
+                  </div>
+                  {/* Booking Code */}
+                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                    {b.bookingCode || "OLD DATA"}
+                  </div>
+                  {/* Date & time */}
+                  <div className="text-xs font-bold text-slate-700">
+                    {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
+                  </div>
+                  {/* Price */}
+                  <div className="text-sm font-black text-blue-700">
+                    Rp {Number(b.totalPrice ?? 0).toLocaleString("id-ID")}
+                  </div>
+                  {/* Status row */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StatusPill status={b.status} />
+                    <CourtAvailTag booking={b} />
+                  </div>
+                </div>
+                {/* Footer */}
+                <div className="border-t border-slate-100 px-4 py-3">
+                  <button onClick={() => setSelected(b)}
+                    className="w-full text-xs font-black text-blue-600 border border-blue-200 rounded-xl py-2 hover:bg-blue-50 active:scale-95 transition-all">
+                    Lihat Detail
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Detail Modal */}
       {selected && (
         <div className="fixed inset-0 z-[250] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onClick={() => setSelected(null)}>

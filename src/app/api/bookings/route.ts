@@ -66,18 +66,30 @@ function parseBookingTimeRange(body: unknown) {
   return { startTime, endTime };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const dateQuery = searchParams.get("date");
+
     const userRole = session.user.role;
     const userId = session.user.id;
 
+    const whereClause: any = userRole === "ADMIN" ? {} : { userId };
+
+    if (dateQuery) {
+      const parsedDate = coerceDateOnlyUTC(dateQuery);
+      if (parsedDate) {
+        whereClause.date = parsedDate;
+      }
+    }
+
     const bookings = await prisma.booking.findMany({
-      where: userRole === "ADMIN" ? {} : { userId },
+      where: whereClause,
       include: {
         user: { select: { id: true, name: true, email: true } },
         court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
