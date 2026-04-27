@@ -147,6 +147,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Booking duration must be in full hours" }, { status: 400 });
     }
 
+    // Past time validation
+    const now = new Date();
+    const localDateStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const bookingDateStr = bookingDate.toISOString().split('T')[0];
+    
+    if (bookingDateStr < localDateStr) {
+      return NextResponse.json({ error: "Tidak bisa booking untuk tanggal yang sudah lewat." }, { status: 400 });
+    }
+    if (bookingDateStr === localDateStr && startTime <= nowMinutes) {
+      return NextResponse.json({ error: "Waktu booking sudah terlewat hari ini." }, { status: 400 });
+    }
+
     const lockKey = `${courtId}:${bookingDate.toISOString().slice(0, 10)}`;
 
     const created = await prisma.$transaction(async (tx) => {

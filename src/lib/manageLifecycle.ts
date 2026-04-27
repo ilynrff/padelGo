@@ -19,7 +19,7 @@ export async function manageBookingLifecycle() {
 
   // 2. Auto-complete CONFIRMED bookings whose end time has passed
   const allConfirmed = await prisma.booking.findMany({
-    where: { status: { in: ["CONFIRMED", "RESCHEDULE_APPROVED"] } },
+    where: { status: { in: ["CONFIRMED", "RESCHEDULE_APPROVED", "CHECKED_IN"] } },
     select: { id: true, date: true, endTime: true },
   });
 

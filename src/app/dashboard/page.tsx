@@ -11,6 +11,7 @@ import { Toast } from "@/components/ui/Toast";
 import { PaymentDeadlineCountdown } from "@/components/dashboard/PaymentDeadlineCountdown";
 import { PaymentDeadlineBadge } from "@/components/dashboard/PaymentDeadlineBadge";
 import { RescheduleModal } from "@/components/dashboard/RescheduleModal";
+import { BookingTimeAwareness } from "@/components/dashboard/BookingTimeAwareness";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchJson } from "@/lib/fetchJson";
@@ -48,14 +49,16 @@ const BookingRow = React.memo(({
   onFileChange, 
   onUpload, 
   isUploading, 
-  onReschedule 
+  onReschedule,
+  onShowDetail
 }: { 
   b: Booking, 
   file: File | null, 
   onFileChange: (f: File | null) => void, 
   onUpload: () => void, 
   isUploading: boolean,
-  onReschedule: (b: Booking) => void
+  onReschedule: (b: Booking) => void,
+  onShowDetail: (b: Booking) => void
 }) => {
   const bookingStart = new Date(b.date);
   bookingStart.setUTCMinutes(bookingStart.getUTCMinutes() + b.startTime);
@@ -63,8 +66,13 @@ const BookingRow = React.memo(({
   const canReschedule = hoursUntil > 12;
   const isExpiredByTime = b.expiresAt ? new Date(b.expiresAt) < new Date() : false;
 
+  const isClickable = b.status === "CONFIRMED" || b.status === "RESCHEDULE_APPROVED" || b.status === "CHECKED_IN";
+
   return (
-    <Card className="p-6 rounded-[2rem] border-slate-100 shadow-sm overflow-hidden">
+    <Card 
+      className={`p-6 rounded-[2rem] border-slate-100 shadow-sm overflow-hidden transition-all ${isClickable ? 'cursor-pointer hover:shadow-md hover:border-blue-200 hover:-translate-y-0.5' : ''}`}
+      onClick={() => isClickable && onShowDetail(b)}
+    >
       {/* Header row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="space-y-1">
@@ -99,13 +107,16 @@ const BookingRow = React.memo(({
                         ? "bg-rose-100 text-rose-700"
                         : b.status === "COMPLETED"
                           ? "bg-blue-100 text-blue-700"
-                          : "bg-slate-100 text-slate-700"
+                          : b.status === "CHECKED_IN"
+                            ? "bg-sky-100 text-sky-700"
+                            : "bg-slate-100 text-slate-700"
             }`}>
               {b.status === "PERLU_VERIFIKASI" ? "Perlu Verifikasi"
                 : b.status === "PENDING" ? "Menunggu Bayar"
                 : b.status === "RESCHEDULE_REQUESTED" ? "Reschedule ⏳"
                 : b.status === "RESCHEDULE_APPROVED" ? "Reschedule ✓"
                 : b.status === "RESCHEDULE_REJECTED" ? "Reschedule ✕"
+                : b.status === "CHECKED_IN" ? "Checked In"
                 : b.status}
             </div>
             {b.status === "PENDING" && b.expiresAt && (
@@ -190,11 +201,14 @@ const BookingRow = React.memo(({
         </div>
       )}
 
+      {/* Time Awareness: Countdowns and Warnings */}
+      <BookingTimeAwareness booking={b as any} />
+
       {/* CONFIRMED: reschedule button */}
-      {b.status === "CONFIRMED" && (
-        <div className="mt-4">
+      {(b.status === "CONFIRMED" || b.status === "RESCHEDULE_APPROVED") && (
+        <div className="mt-4 flex gap-2">
           <button
-            onClick={() => onReschedule(b)}
+            onClick={(e) => { e.stopPropagation(); onReschedule(b); }}
             disabled={!canReschedule}
             title={!canReschedule ? "Hanya bisa reschedule > 12 jam sebelum jadwal" : ""}
             className="text-sm font-bold text-violet-600 border border-violet-200 bg-violet-50 hover:bg-violet-100 rounded-xl px-4 py-2 w-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -242,9 +256,10 @@ export default function DashboardPage() {
   const [uploadingBookingId, setUploadingBookingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
 
   const canFetch = status === "authenticated";
-  const isInteracting = !!rescheduleBooking || !!uploadingBookingId || Object.values(fileByBookingId).some(f => !!f);
+  const isInteracting = !!rescheduleBooking || !!detailBooking || !!uploadingBookingId || Object.values(fileByBookingId).some(f => !!f);
 
   // Redirect ADMIN to /admin
   useEffect(() => {
@@ -418,6 +433,7 @@ export default function DashboardPage() {
                 onUpload={() => submitProof(b.id)}
                 isUploading={uploadingBookingId === b.id}
                 onReschedule={setRescheduleBooking}
+                onShowDetail={setDetailBooking}
               />
             ))
           )}
@@ -438,6 +454,69 @@ export default function DashboardPage() {
           }}
           onError={(msg) => setToast({ msg, type: "error" })}
         />
+      )}
+
+      {/* Detail Modal for Check-in */}
+      {detailBooking && (
+        <div 
+          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => setDetailBooking(null)}
+        >
+          <div 
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="bg-blue-600 px-6 py-8 text-center relative">
+              <button 
+                onClick={() => setDetailBooking(null)}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+              >
+                ✕
+              </button>
+              <p className="text-blue-100 font-bold uppercase tracking-widest text-xs mb-2">Kode Booking</p>
+              <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                {detailBooking.bookingCode || detailBooking.id.slice(0,8)}
+              </h2>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="text-center mb-6">
+                <p className="text-sm font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 inline-block">
+                  Tunjukkan kode booking ini ke admin saat tiba di lokasi.
+                </p>
+              </div>
+
+              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Lapangan</span>
+                  <span className="text-sm font-black text-slate-800">{detailBooking.court?.name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                  <span className="text-sm font-black text-slate-800">{String(detailBooking.date).slice(0,10)}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                  <span className="text-sm font-black text-slate-800">
+                    {formatMinutesToHHmm(detailBooking.startTime)} - {formatMinutesToHHmm(detailBooking.endTime)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Status</span>
+                  <span className={`text-xs font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                    detailBooking.status === "CHECKED_IN" ? "bg-sky-100 text-sky-700" : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    {detailBooking.status === "CHECKED_IN" ? "Checked In" : "Confirmed"}
+                  </span>
+                </div>
+              </div>
+
+              <Button size="full" onClick={() => setDetailBooking(null)}>
+                Tutup
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

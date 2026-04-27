@@ -60,6 +60,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "Sertakan timeSlot atau startTime dan endTime" }, { status: 400 });
     }
 
+    // Past time validation for reschedule
+    const now = new Date();
+    const localDateStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const newDateStr = newDate.toISOString().split('T')[0];
+    
+    if (newDateStr < localDateStr) {
+      return NextResponse.json({ error: "Tidak bisa reschedule ke tanggal yang sudah lewat." }, { status: 400 });
+    }
+    if (newDateStr === localDateStr && rescheduleStartTime <= nowMinutes) {
+      return NextResponse.json({ error: "Waktu slot reschedule sudah terlewat hari ini." }, { status: 400 });
+    }
+
     const updated = await prisma.booking.update({
       where: { id: params.id },
       data: {

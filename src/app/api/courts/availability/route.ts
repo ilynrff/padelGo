@@ -35,12 +35,30 @@ export async function GET(req: Request) {
     });
 
     const slots = buildDailySlotLabels();
-    const availability = slots.map((s) => ({
-      time: s.label,
-      available: !existingBookings.some((b) =>
-        rangesOverlap({ start: b.startTime, end: b.endTime }, { start: s.start, end: s.end }),
-      ),
-    }));
+    
+    const now = new Date();
+    // Assuming the server timezone or the standard local timezone.
+    // To safely compare date strings:
+    const localDateStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const availability = slots.map((s) => {
+      let isPastTime = false;
+      if (dateStr < localDateStr) {
+        isPastTime = true; // Selected date is in the past
+      } else if (dateStr === localDateStr) {
+        if (s.start <= nowMinutes) {
+          isPastTime = true; // Selected time is in the past today
+        }
+      }
+
+      return {
+        time: s.label,
+        available: !isPastTime && !existingBookings.some((b) =>
+          rangesOverlap({ start: b.startTime, end: b.endTime }, { start: s.start, end: s.end }),
+        ),
+      };
+    });
 
     return NextResponse.json(availability, { status: 200 });
   } catch (err: unknown) {

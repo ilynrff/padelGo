@@ -33,6 +33,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   PENDING:               { label: "Menunggu Bayar",     bg: "bg-orange-100", text: "text-orange-700" },
   PERLU_VERIFIKASI:      { label: "Perlu Verifikasi",   bg: "bg-amber-100",  text: "text-amber-700" },
   CONFIRMED:             { label: "Confirmed",           bg: "bg-emerald-100",text: "text-emerald-700" },
+  CHECKED_IN:            { label: "Checked In",          bg: "bg-sky-100",    text: "text-sky-700" },
   CANCELLED:             { label: "Cancelled",           bg: "bg-red-100",    text: "text-red-700" },
   EXPIRED:               { label: "Expired",             bg: "bg-slate-200",  text: "text-slate-600" },
   COMPLETED:             { label: "Completed",           bg: "bg-blue-100",   text: "text-blue-700" },
@@ -102,6 +103,26 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
       showToast(`Status berhasil diubah ke ${STATUS_CONFIG[status]?.label ?? status}`, "success");
     } catch (e) { showToast(getErrorMessage(e) || "Gagal update", "error"); }
     finally { setIsProcessing(false); }
+  };
+
+  const checkIn = async (bookingCode: string) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/bookings/checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal check-in");
+      showToast("Check-in berhasil", "success");
+      await refresh();
+      setSelected(null);
+    } catch (e: any) {
+      showToast(e.message || "Gagal check-in", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const patchReschedule = async (id: string, action: "approve" | "reject") => {
@@ -321,7 +342,19 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
                     </button>
                   </div>
                 )}
-                {["CONFIRMED", "RESCHEDULE_REJECTED"].includes(selected.status) && (
+                {["CONFIRMED", "RESCHEDULE_APPROVED"].includes(selected.status) && (
+                  <div className="flex flex-col gap-2">
+                    <button disabled={isProcessing} onClick={() => checkIn(selected.bookingCode || "")}
+                      className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition-colors disabled:opacity-60 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)]">
+                      📍 Confirm Check-in
+                    </button>
+                    <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "CANCELLED")}
+                      className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition-colors disabled:opacity-60">
+                      Cancel Booking
+                    </button>
+                  </div>
+                )}
+                {selected.status === "RESCHEDULE_REJECTED" && (
                   <button disabled={isProcessing} onClick={() => patchStatus(selected.id, "CANCELLED")}
                     className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition-colors disabled:opacity-60">
                     Cancel Booking
