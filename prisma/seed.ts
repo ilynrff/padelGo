@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -11,40 +12,67 @@ const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // Keep this seed script idempotent and focused (courts only).
-  console.log("🌱 Seeding courts...");
+  console.log("🌱 Seeding database...");
 
+  // 🔐 HASH PASSWORD
+  const adminPassword = await bcrypt.hash("admin123", 10);
+  const userPassword = await bcrypt.hash("user123", 10);
+
+  // 🧹 OPTIONAL: reset data biar clean
   await prisma.payment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.court.deleteMany();
+  await prisma.user.deleteMany(); // biar gak nyampur password lama
 
+  // 👤 ADMIN
+  await prisma.user.create({
+    data: {
+      name: "Admin",
+      email: "admin@gmail.com",
+      password: adminPassword,
+      role: "ADMIN",
+    },
+  });
+
+  // 👤 USER
+  await prisma.user.create({
+    data: {
+      name: "User",
+      email: "user@gmail.com",
+      password: userPassword,
+      role: "USER",
+    },
+  });
+
+  // 🏟 COURTS
   const result = await prisma.court.createMany({
     data: [
       {
         name: "Padel Court A (Premium)",
         location: "Banyumanik, Semarang",
         pricePerHour: 150000,
-        image:
-          "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&q=80&w=800",
+        images: ["/images/court-1.jpg"],
+        description: "Lapangan premium",
       },
       {
         name: "Indoor Panoramic Court",
         location: "Tembalang, Semarang",
         pricePerHour: 200000,
-        image:
-          "https://images.unsplash.com/photo-1622325055171-897b9ee9059e?auto=format&fit=crop&q=80&w=800",
+        images: ["/images/court-2.jpg"],
+        description: "Lapangan indoor santai",
       },
       {
         name: "Outdoor Classic Court",
         location: "Simpang Lima, Semarang",
         pricePerHour: 120000,
-        image:
-          "https://images.unsplash.com/photo-1592919016382-7718e268923a?auto=format&fit=crop&q=80&w=800",
+        images: ["/images/court-3.jpg"],
+        description: "Lapangan outdoor santai",
       },
     ],
   });
 
   console.log(`✅ Courts created: ${result.count}`);
+  console.log("✅ Users created: admin & user");
 }
 
 main()

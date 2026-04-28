@@ -11,36 +11,42 @@ type Court = {
   name: string;
   location: string;
   pricePerHour: number;
-  image?: string | null;
+  images: string[];
   description?: string | null;
 };
-
+ 
 type EditingCourt = {
   id?: string;
   name: string;
   location: string;
   pricePerHour: number;
-  image?: string;
+  images: string[];
   description?: string;
 };
-
+ 
 export function CourtManager() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [editingCourt, setEditingCourt] = useState<EditingCourt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+ 
   const [toast, setToast] = useState<{
     msg: string;
     type: "success" | "error";
   } | null>(null);
-
+ 
   const refresh = async () => {
     setIsLoading(true);
     try {
       const data = await fetchJson<Court[]>("/api/courts");
-      setCourts(Array.isArray(data) ? data : []);
+      // Backward compatibility: map single image to images array if needed
+      const mapped = (Array.isArray(data) ? data : []).map(c => ({
+        ...c,
+        images: c.images || (c as any).image ? [(c as any).image] : []
+      }));
+      setCourts(mapped);
     } catch (e: unknown) {
       setToast({
         msg: getErrorMessage(e) || "Terjadi kesalahan",
@@ -51,41 +57,62 @@ export function CourtManager() {
       setIsLoading(false);
     }
   };
-
+ 
   useEffect(() => {
     refresh();
   }, []);
-
+ 
   const openAdd = () => {
-    setEditingCourt({ name: "", location: "", pricePerHour: 0, image: "" });
+    setEditingCourt({ name: "", location: "", pricePerHour: 0, images: [] });
+    setSelectedFiles([]);
     setModalMode("add");
   };
-
+ 
   const openEdit = (court: Court) => {
     setEditingCourt({
       id: court.id,
       name: court.name || "",
       location: court.location || "",
       pricePerHour: court.pricePerHour || 0,
-      image: court.image || "",
+      images: court.images || [],
       description: court.description || "",
     });
+    setSelectedFiles([]);
     setModalMode("edit");
   };
-
+ 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourt) return;
     setIsSaving(true);
     try {
+      let finalImages = [...editingCourt.images];
+
+      // 1. Upload new files if any
+      if (selectedFiles.length > 0) {
+        const uploadPromises = selectedFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok) throw new Error("Gagal upload gambar");
+          const data = await res.json();
+          return data.url;
+        });
+        const uploadedUrls = await Promise.all(uploadPromises);
+        finalImages = [...finalImages, ...uploadedUrls];
+      }
+
       const payload = {
         name: editingCourt.name,
         location: editingCourt.location,
         pricePerHour: Number(editingCourt.pricePerHour),
-        image: editingCourt.image || null,
+        images: finalImages.filter(Boolean),
         description: editingCourt.description || null,
       };
-
+ 
       if (modalMode === "add") {
         await fetchJson<Court>("/api/courts", {
           method: "POST",
@@ -99,10 +126,11 @@ export function CourtManager() {
           body: JSON.stringify(payload),
         });
       }
-
+ 
       setToast({ msg: "Court tersimpan.", type: "success" });
       setModalMode(null);
       setEditingCourt(null);
+      setSelectedFiles([]);
       await refresh();
     } catch (e: unknown) {
       setToast({
@@ -279,17 +307,82 @@ export function CourtManager() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                  Image URL (Opsional)
+                  Gambar Lapangan
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://example.com/image.jpg"
-                  className="w-full border border-slate-200 rounded-lg px-4 py-3 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  value={editingCourt.image ?? ""}
-                  onChange={(e) =>
-                    setEditingCourt({ ...editingCourt, image: e.target.value })
-                  }
-                />
+                
+                {/* Existing Images List */}
+                <div className="space-y-2 mb-3">
+                  {editingCourt.images.map((url, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <img src={url} alt="preview" className="w-8 h-8 object-cover rounded" />
+                        <span className="text-xs font-medium text-slate-500 truncate">{url}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const next = editingCourt.images.filter((_, i) => i !== idx);
+                          setEditingCourt({ ...editingCourt, images: next });
+                        }}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {selectedFiles.map((file, idx) => (
+                    <div key={`file-${idx}`} className="flex items-center justify-between bg-blue-50 p-2 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <div className="w-8 h-8 bg-blue-200 rounded flex items-center justify-center text-[10px] font-bold text-blue-700">FILE</div>
+                        <span className="text-xs font-medium text-blue-500 truncate">{file.name}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const next = selectedFiles.filter((_, i) => i !== idx);
+                          setSelectedFiles(next);
+                        }}
+                        className="text-blue-500 hover:text-blue-700 p-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setSelectedFiles([...selectedFiles, ...files]);
+                    }}
+                  />
+                  
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Atau masukkan URL gambar..."
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = (e.target as HTMLInputElement).value;
+                          if (val) {
+                            setEditingCourt({ ...editingCourt, images: [...editingCourt.images, val] });
+                            (e.target as HTMLInputElement).value = "";
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    *Tekan Enter pada input URL untuk menambahkannya ke daftar.
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">

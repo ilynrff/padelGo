@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { fetchJson } from "@/lib/fetchJson";
+import { ImageCarousel } from "@/components/ui/ImageCarousel";
 
 const FEATURES = [
   {
@@ -90,6 +91,7 @@ export default function Home() {
       name: string;
       location: string;
       pricePerHour: number;
+      images?: string[] | null;
       image?: string | null;
       description?: string | null;
     }[]
@@ -104,6 +106,7 @@ export default function Home() {
         name: string;
         location: string;
         pricePerHour: number;
+        images?: string[] | null;
         image?: string | null;
         description?: string | null;
       }[]
@@ -211,13 +214,9 @@ export default function Home() {
                     className="group flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
                   >
                     <div className="h-52 w-full relative overflow-hidden">
-                      <img
-                        src={court.image || "/images/court-1.jpg"}
-                        alt={court.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
-                      <div className="absolute bottom-4 left-4 text-white text-xs font-bold bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg">
+                      <ImageCarousel images={court.images || (court.image ? [court.image] : [])} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent pointer-events-none"></div>
+                      <div className="absolute bottom-4 left-4 text-white text-xs font-bold bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg z-10">
                         {court.location}
                       </div>
                     </div>

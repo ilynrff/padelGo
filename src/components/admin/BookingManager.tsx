@@ -88,20 +88,39 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
     refresh();
   }, [dateFilter]);
 
-  const showToast = (msg: string, type: "success" | "error") => {
+  // Silent auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refresh(true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [dateFilter]);
 
+  const showToast = (msg: string, type: "success" | "error") => {
     setToastQueue((q) => [...q, { msg, type }]);
     setTimeout(() => setToastQueue((q) => q.slice(1)), 3500);
   };
 
-  const refresh = async () => {
-    setIsRefreshing(true);
+  const refresh = async (isSilent = false) => {
+    if (!isSilent) setIsRefreshing(true);
     try {
       const url = dateFilter ? `/api/bookings?date=${dateFilter}` : "/api/bookings";
       const data = await fetchJson<Booking[]>(url);
-      setBookings(Array.isArray(data) ? data : []);
-    } catch (e) { showToast(getErrorMessage(e) || "Error", "error"); }
-    finally { setIsRefreshing(false); }
+      const newData = Array.isArray(data) ? data : [];
+      
+      setBookings(newData);
+
+      // Auto-update any open modals or search results so they reflect latest status
+      if (isSilent) {
+        setSelected(prev => prev ? (newData.find(b => b.id === prev.id) || prev) : null);
+        setSearchedBooking(prev => prev ? (newData.find(b => b.id === prev.id) || prev) : null);
+      }
+    } catch (e) { 
+      if (!isSilent) showToast(getErrorMessage(e) || "Error", "error"); 
+    }
+    finally { 
+      if (!isSilent) setIsRefreshing(false); 
+    }
   };
 
   const patchStatus = async (id: string, status: string) => {

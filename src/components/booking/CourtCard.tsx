@@ -1,4 +1,5 @@
 import React from "react";
+import { ImageCarousel } from "@/components/ui/ImageCarousel";
 
 interface CourtCardProps {
   court: {
@@ -6,7 +7,8 @@ interface CourtCardProps {
     name: string;
     location: string;
     pricePerHour: number;
-    image?: string | null;
+    images?: string[] | null;
+    image?: string | null; // Backward compatibility
     description?: string | null;
   };
   isSelected: boolean;
@@ -14,6 +16,8 @@ interface CourtCardProps {
 }
 
 export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
+  const courtImages = court.images || (court.image ? [court.image] : []);
+
   return (
     <div
       onClick={onSelect}
@@ -23,21 +27,9 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
           : "border-slate-100 hover:border-slate-300 hover:shadow-lg hover:-translate-y-1"
       }`}
     >
-      {/* Court Image */}
+      {/* Court Image Carousel */}
       <div className="h-40 w-full relative overflow-hidden bg-slate-200">
-        <div className="absolute inset-0 transition-transform duration-500 hover:scale-110">
-          {court.image ? (
-            <img
-              src={court.image}
-              alt={court.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
-              Court Image
-            </div>
-          )}
-        </div>
+        <ImageCarousel images={courtImages} />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none"></div>
 
         {/* Location badge */}

@@ -12,21 +12,21 @@ const DEFAULT_COURTS = [
     name: "Padel Court A (Premium)",
     location: "Banyumanik, Semarang",
     pricePerHour: 150000,
-    image: "/images/court-premium.jpg",
+    images: ["/images/court-premium.jpg"],
     description: "Lapangan premium standar internasional dengan fasilitas lengkap, pencahayaan LED anti-silau, dan lantai turf berkualitas tinggi.",
   },
   {
     name: "Indoor Panoramic Court",
     location: "Tembalang, Semarang",
     pricePerHour: 200000,
-    image: "/images/court-1.jpg",
+    images: ["/images/court-1.jpg"],
     description: "Lapangan indoor dengan pencahayaan panoramic modern, full enclosed glass wall, cocok untuk latihan intensif malam hari.",
   },
   {
     name: "Outdoor Classic Court",
     location: "Simpang Lima, Semarang",
     pricePerHour: 120000,
-    image: "/images/court-2.jpg",
+    images: ["/images/court-2.jpg"],
     description: "Lapangan outdoor dengan suasana alami dan udara terbuka, rumput sintetis premium dengan sirkulasi udara terbaik.",
   },
 ];
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     const name = payload.name;
     const location = payload.location;
     const pricePerHour = payload.pricePerHour;
-    const image = payload.image;
+    const images = payload.images;
     const description = payload.description;
 
     if (!name || !location || typeof pricePerHour !== "number" || pricePerHour < 0) {
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
         name: String(name),
         location: String(location),
         pricePerHour: Math.round(pricePerHour),
-        image: image ? String(image) : null,
+        images: Array.isArray(images) ? images.filter((img): img is string => !!img) : [],
         description: description ? String(description) : null,
       },
     });

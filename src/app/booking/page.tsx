@@ -10,6 +10,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarView } from "@/components/booking/CalendarView";
+import { ImageCarousel } from "@/components/ui/ImageCarousel";
 
 export default function BookingPage() {
   const { data: session } = useSession();
@@ -195,24 +196,13 @@ export default function BookingPage() {
             >
               ✕
             </button>
-            <div className="relative h-64 md:h-80 w-full bg-slate-200 flex items-center justify-center">
+            <div className="relative h-64 md:h-80 w-full bg-slate-200">
               {(() => {
                 const previewCourt = courts.find(
                   (c) => c.id === previewCourtInfo,
                 );
-                if (previewCourt?.image) {
-                  return (
-                    <Image
-                      src={previewCourt.image}
-                      alt="Court"
-                      fill
-                      className="object-cover"
-                    />
-                  );
-                }
-                return (
-                  <p className="font-bold text-slate-400">Padel Court Banner</p>
-                );
+                const courtImages = previewCourt?.images || (previewCourt?.image ? [previewCourt.image] : []);
+                return <ImageCarousel images={courtImages} />;
               })()}
             </div>
             <div className="p-6 md:p-8">

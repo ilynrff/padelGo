@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
+        court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
         payment: { select: { id: true, status: true, proofImage: true, createdAt: true } },
       },
     });
@@ -105,7 +105,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         },
         include: {
           user: { select: { id: true, name: true, email: true } },
-          court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
+          court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
           payment: { select: { id: true, status: true, proofImage: true, createdAt: true } },
         },
       });

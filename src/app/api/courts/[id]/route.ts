@@ -17,7 +17,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const body: unknown = await req.json();
     const payload = (body ?? {}) as Record<string, unknown>;
-    const { name, location, pricePerHour, image, description } = payload;
+    const { name, location, pricePerHour, images, description } = payload;
 
     const updated = await prisma.court.update({
       where: { id: params.id },
@@ -27,7 +27,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         ...(pricePerHour !== undefined
           ? { pricePerHour: Math.round(Number(pricePerHour)) }
           : {}),
-        ...(image !== undefined ? { image: image ? String(image) : null } : {}),
+        ...(images !== undefined ? { images: Array.isArray(images) ? images.filter((img): img is string => !!img) : [] } : {}),
         ...(description !== undefined ? { description: description ? String(description) : null } : {}),
       },
     });

@@ -92,7 +92,7 @@ export async function GET(req: Request) {
       where: whereClause,
       include: {
         user: { select: { id: true, name: true, email: true } },
-        court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
+        court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
         payment: { select: { id: true, status: true, proofImage: true, createdAt: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -239,7 +239,7 @@ export async function POST(req: Request) {
           expiresAt,
         },
         include: {
-          court: { select: { id: true, name: true, location: true, pricePerHour: true, image: true } },
+          court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
         },
       });
 
