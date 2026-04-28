@@ -41,7 +41,7 @@ model Court {
   name         String
   location     String
   pricePerHour Int
-  images       String[]  @default([])
+  images       Json      @default("[]")
   description  String?
   bookings     Booking[]
   createdAt    DateTime  @default(now())

@@ -66,6 +66,8 @@ function parseBookingTimeRange(body: unknown) {
   return { startTime, endTime };
 }
 
+import { normalizeImages } from "@/lib/courtUtils";
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -88,7 +90,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const bookings = await prisma.booking.findMany({
+    const rawBookings = await prisma.booking.findMany({
       where: whereClause,
       include: {
         user: { select: { id: true, name: true, email: true } },
@@ -97,6 +99,14 @@ export async function GET(req: Request) {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const bookings = rawBookings.map(b => ({
+      ...b,
+      court: b.court ? {
+        ...b.court,
+        images: normalizeImages(b.court.images)
+      } : null
+    }));
 
     return NextResponse.json(bookings, { status: 200 });
   } catch (err: unknown) {
@@ -242,6 +252,10 @@ export async function POST(req: Request) {
           court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
         },
       });
+
+      if (booking && booking.court) {
+        booking.court.images = normalizeImages(booking.court.images) as any;
+      }
 
       return booking;
     });

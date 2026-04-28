@@ -12,41 +12,51 @@ const DEFAULT_COURTS = [
     name: "Padel Court A (Premium)",
     location: "Banyumanik, Semarang",
     pricePerHour: 150000,
-    images: ["/images/court-premium.jpg"],
+    images: [{ url: "/images/court-premium.jpg", isDefault: true, isActive: true }],
     description: "Lapangan premium standar internasional dengan fasilitas lengkap, pencahayaan LED anti-silau, dan lantai turf berkualitas tinggi.",
   },
   {
     name: "Indoor Panoramic Court",
     location: "Tembalang, Semarang",
     pricePerHour: 200000,
-    images: ["/images/court-1.jpg"],
+    images: [{ url: "/images/court-1.jpg", isDefault: true, isActive: true }],
     description: "Lapangan indoor dengan pencahayaan panoramic modern, full enclosed glass wall, cocok untuk latihan intensif malam hari.",
   },
   {
     name: "Outdoor Classic Court",
     location: "Simpang Lima, Semarang",
     pricePerHour: 120000,
-    images: ["/images/court-2.jpg"],
+    images: [{ url: "/images/court-2.jpg", isDefault: true, isActive: true }],
     description: "Lapangan outdoor dengan suasana alami dan udara terbuka, rumput sintetis premium dengan sirkulasi udara terbaik.",
   },
 ];
 
+import { normalizeImages } from "@/lib/courtUtils";
+
 export async function GET() {
   console.log("API: Fetching courts...");
   try {
-    let courts = await prisma.court.findMany({
+    const rawCourts = await prisma.court.findMany({
       orderBy: { name: "asc" },
     });
 
-    // Auto-seed if table is empty
+    // Normalize images and auto-seed if table is empty
+    const courts = rawCourts.map(c => ({
+      ...c,
+      images: normalizeImages(c.images)
+    }));
+
     if (courts.length === 0) {
       console.log("API: Court table empty — seeding default courts...");
       await prisma.court.createMany({
-        data: DEFAULT_COURTS,
+        data: DEFAULT_COURTS as any,
         skipDuplicates: true,
       });
-      courts = await prisma.court.findMany({ orderBy: { name: "asc" } });
-      console.log(`API: Auto-seeded ${courts.length} default courts.`);
+      const freshCourts = await prisma.court.findMany({ orderBy: { name: "asc" } });
+      return NextResponse.json(freshCourts.map(c => ({
+        ...c,
+        images: normalizeImages(c.images)
+      })), { status: 200 });
     }
 
     console.log(`API: Found ${courts.length} courts.`);
@@ -80,12 +90,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
+    const finalImages = images !== undefined ? normalizeImages(images) : [];
+
     const court = await prisma.court.create({
       data: {
         name: String(name),
         location: String(location),
         pricePerHour: Math.round(pricePerHour),
-        images: Array.isArray(images) ? images.filter((img): img is string => !!img) : [],
+        images: finalImages,
         description: description ? String(description) : null,
       },
     });

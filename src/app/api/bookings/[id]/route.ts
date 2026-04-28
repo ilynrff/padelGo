@@ -9,6 +9,8 @@ export const revalidate = 0;
 
 const VALID_STATUSES = ["PENDING", "CONFIRMED", "CANCELLED", "EXPIRED", "COMPLETED", "REFUNDED", "PERLU_VERIFIKASI"];
 
+import { normalizeImages } from "@/lib/courtUtils";
+
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
@@ -27,6 +29,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     });
 
     if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Normalize court images
+    if (booking.court) {
+      booking.court.images = normalizeImages(booking.court.images) as any;
+    }
+
     return NextResponse.json(booking);
   } catch (error: unknown) {
     return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(error) }, { status: 500 });
@@ -97,7 +105,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         }
       }
 
-      return tx.booking.update({
+      const result = await tx.booking.update({
         where: { id: params.id },
         data: {
           status: normalized as any,
@@ -109,6 +117,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           payment: { select: { id: true, status: true, proofImage: true, createdAt: true } },
         },
       });
+
+      if (result && result.court) {
+        result.court.images = normalizeImages(result.court.images) as any;
+      }
+      return result;
     });
 
     if (!updatedBooking) return NextResponse.json({ error: "Not found" }, { status: 404 });

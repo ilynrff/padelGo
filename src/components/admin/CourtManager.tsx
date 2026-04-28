@@ -6,24 +6,30 @@ import { Toast } from "@/components/ui/Toast";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchJson } from "@/lib/fetchJson";
 
+type CourtImage = {
+  url: string;
+  isDefault: boolean;
+  isActive: boolean;
+};
+
 type Court = {
   id: string;
   name: string;
   location: string;
   pricePerHour: number;
-  images: string[];
+  images: CourtImage[];
   description?: string | null;
 };
- 
+
 type EditingCourt = {
   id?: string;
   name: string;
   location: string;
   pricePerHour: number;
-  images: string[];
+  images: CourtImage[];
   description?: string;
 };
- 
+
 export function CourtManager() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
@@ -31,21 +37,34 @@ export function CourtManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
- 
+
   const [toast, setToast] = useState<{
     msg: string;
     type: "success" | "error";
   } | null>(null);
- 
+
   const refresh = async () => {
     setIsLoading(true);
     try {
       const data = await fetchJson<Court[]>("/api/courts");
-      // Backward compatibility: map single image to images array if needed
-      const mapped = (Array.isArray(data) ? data : []).map(c => ({
-        ...c,
-        images: c.images || (c as any).image ? [(c as any).image] : []
-      }));
+      // Backward compatibility & mapping
+      const mapped = (Array.isArray(data) ? data : []).map((c) => {
+        let rawImages = c.images || [];
+        // If it's still string array, map it
+        const images = rawImages
+          .map((img: any) => {
+            if (typeof img === "string")
+              return { url: img, isDefault: false, isActive: true };
+            return {
+              url: img.url || "",
+              isDefault: !!img.isDefault,
+              isActive: img.isActive !== undefined ? !!img.isActive : true,
+            };
+          })
+          .filter((img: any) => !!img.url);
+
+        return { ...c, images };
+      });
       setCourts(mapped);
     } catch (e: unknown) {
       setToast({
@@ -57,30 +76,30 @@ export function CourtManager() {
       setIsLoading(false);
     }
   };
- 
+
   useEffect(() => {
     refresh();
   }, []);
- 
+
   const openAdd = () => {
     setEditingCourt({ name: "", location: "", pricePerHour: 0, images: [] });
     setSelectedFiles([]);
     setModalMode("add");
   };
- 
+
   const openEdit = (court: Court) => {
     setEditingCourt({
       id: court.id,
       name: court.name || "",
       location: court.location || "",
       pricePerHour: court.pricePerHour || 0,
-      images: court.images || [],
+      images: JSON.parse(JSON.stringify(court.images || [])), // deep clone
       description: court.description || "",
     });
     setSelectedFiles([]);
     setModalMode("edit");
   };
- 
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourt) return;
@@ -99,20 +118,20 @@ export function CourtManager() {
           });
           if (!res.ok) throw new Error("Gagal upload gambar");
           const data = await res.json();
-          return data.url;
+          return { url: data.url, isDefault: false, isActive: true };
         });
-        const uploadedUrls = await Promise.all(uploadPromises);
-        finalImages = [...finalImages, ...uploadedUrls];
+        const uploadedImages = await Promise.all(uploadPromises);
+        finalImages = [...finalImages, ...uploadedImages];
       }
 
       const payload = {
         name: editingCourt.name,
         location: editingCourt.location,
         pricePerHour: Number(editingCourt.pricePerHour),
-        images: finalImages.filter(Boolean),
+        images: finalImages.filter((img) => !!img.url),
         description: editingCourt.description || null,
       };
- 
+
       if (modalMode === "add") {
         await fetchJson<Court>("/api/courts", {
           method: "POST",
@@ -126,7 +145,7 @@ export function CourtManager() {
           body: JSON.stringify(payload),
         });
       }
- 
+
       setToast({ msg: "Court tersimpan.", type: "success" });
       setModalMode(null);
       setEditingCourt(null);
@@ -187,7 +206,7 @@ export function CourtManager() {
 
       {/* Courts List */}
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 animate-pulse">
+        <div className="bg-white rounded-xl border border-slate-200 p-8 animate-pulse text-center">
           ⏳ Loading...
         </div>
       ) : courts.length === 0 ? (
@@ -211,6 +230,10 @@ export function CourtManager() {
                       <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold text-xs whitespace-nowrap">
                         Rp {Number(c.pricePerHour || 0).toLocaleString("id-ID")}
                         /jam
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        {c.images.filter((img) => img.isActive).length} Foto
+                        Aktif
                       </span>
                     </div>
                     <h4 className="font-bold text-slate-900 text-base truncate">
@@ -246,7 +269,7 @@ export function CourtManager() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
           <form
             onSubmit={handleSave}
-            className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl"
+            className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             <h3 className="font-bold text-2xl text-slate-900 mb-6">
               {modalMode === "add" ? "Tambah Lapangan Baru" : "Edit Lapangan"}
@@ -309,37 +332,84 @@ export function CourtManager() {
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                   Gambar Lapangan
                 </label>
-                
+
                 {/* Existing Images List */}
                 <div className="space-y-2 mb-3">
-                  {editingCourt.images.map((url, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200">
+                  {editingCourt.images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-opacity ${img.isActive ? "bg-slate-50 border-slate-200" : "bg-slate-100 border-slate-200 opacity-50"}`}
+                    >
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <img src={url} alt="preview" className="w-8 h-8 object-cover rounded" />
-                        <span className="text-xs font-medium text-slate-500 truncate">{url}</span>
+                        <img
+                          src={img.url}
+                          alt="preview"
+                          className="w-8 h-8 object-cover rounded"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-tighter text-slate-400">
+                            {img.isDefault ? "Default Asset" : "Custom Upload"}
+                          </span>
+                          <span className="text-xs font-medium text-slate-500 truncate max-w-[150px]">
+                            {img.url}
+                          </span>
+                        </div>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const next = editingCourt.images.filter((_, i) => i !== idx);
-                          setEditingCourt({ ...editingCourt, images: next });
-                        }}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        ✕
-                      </button>
+                      <div className="flex gap-1">
+                        {img.isDefault ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...editingCourt.images];
+                              next[idx].isActive = !next[idx].isActive;
+                              setEditingCourt({
+                                ...editingCourt,
+                                images: next,
+                              });
+                            }}
+                            className={`text-[10px] font-black uppercase px-2 py-1 rounded ${img.isActive ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                          >
+                            {img.isActive ? "Disable" : "Enable"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = editingCourt.images.filter(
+                                (_, i) => i !== idx,
+                              );
+                              setEditingCourt({
+                                ...editingCourt,
+                                images: next,
+                              });
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {selectedFiles.map((file, idx) => (
-                    <div key={`file-${idx}`} className="flex items-center justify-between bg-blue-50 p-2 rounded-lg border border-blue-200">
+                    <div
+                      key={`file-${idx}`}
+                      className="flex items-center justify-between bg-blue-50 p-2 rounded-lg border border-blue-200"
+                    >
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-8 h-8 bg-blue-200 rounded flex items-center justify-center text-[10px] font-bold text-blue-700">FILE</div>
-                        <span className="text-xs font-medium text-blue-500 truncate">{file.name}</span>
+                        <div className="w-8 h-8 bg-blue-200 rounded flex items-center justify-center text-[10px] font-bold text-blue-700">
+                          FILE
+                        </div>
+                        <span className="text-xs font-medium text-blue-500 truncate">
+                          {file.name}
+                        </span>
                       </div>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => {
-                          const next = selectedFiles.filter((_, i) => i !== idx);
+                          const next = selectedFiles.filter(
+                            (_, i) => i !== idx,
+                          );
                           setSelectedFiles(next);
                         }}
                         className="text-blue-500 hover:text-blue-700 p-1"
@@ -361,7 +431,7 @@ export function CourtManager() {
                       setSelectedFiles([...selectedFiles, ...files]);
                     }}
                   />
-                  
+
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -372,7 +442,13 @@ export function CourtManager() {
                           e.preventDefault();
                           const val = (e.target as HTMLInputElement).value;
                           if (val) {
-                            setEditingCourt({ ...editingCourt, images: [...editingCourt.images, val] });
+                            setEditingCourt({
+                              ...editingCourt,
+                              images: [
+                                ...editingCourt.images,
+                                { url: val, isDefault: false, isActive: true },
+                              ],
+                            });
                             (e.target as HTMLInputElement).value = "";
                           }
                         }

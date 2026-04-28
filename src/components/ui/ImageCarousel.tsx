@@ -3,20 +3,29 @@
 import React, { useState, useEffect } from "react";
 
 interface ImageCarouselProps {
-  images: string[];
+  images: any[];
   autoSlide?: boolean;
   interval?: number;
   className?: string;
 }
 
 export function ImageCarousel({
-  images,
+  images: rawImages,
   autoSlide = true,
   interval = 3000,
   className = "",
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+
+  // Normalize images to array of strings (URLs) based on isActive
+  const images = (rawImages || []).map(img => {
+    if (typeof img === "string") return { url: img, isActive: true };
+    return {
+      url: img.url || "",
+      isActive: img.isActive !== undefined ? !!img.isActive : true
+    };
+  }).filter(img => !!img.url && img.isActive).map(img => img.url);
 
   useEffect(() => {
     if (!autoSlide || images.length <= 1 || isHovered) return;

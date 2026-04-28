@@ -3,8 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getErrorMessage } from "@/lib/errorMessage";
-
-export const dynamic = "force-dynamic";
+import { normalizeImages } from "@/lib/courtUtils";
 
 export async function GET(req: Request) {
   try {
@@ -31,6 +30,11 @@ export async function GET(req: Request) {
 
     if (!booking) {
       return NextResponse.json({ error: "Booking tidak ditemukan" }, { status: 404 });
+    }
+
+    // Normalize court images
+    if (booking.court) {
+      booking.court.images = normalizeImages(booking.court.images) as any;
     }
 
     return NextResponse.json(booking, { status: 200 });
