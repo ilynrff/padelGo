@@ -22,13 +22,13 @@ async function main() {
   await prisma.payment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.court.deleteMany();
-  await prisma.user.deleteMany(); // biar gak nyampur password lama
+  await prisma.user.deleteMany();
 
   // 👤 ADMIN
   await prisma.user.create({
     data: {
       name: "Admin",
-      email: "admin@gmail.com",
+      email: "admin@padelgo.id",
       password: adminPassword,
       role: "ADMIN",
     },
@@ -38,7 +38,7 @@ async function main() {
   await prisma.user.create({
     data: {
       name: "User",
-      email: "user@gmail.com",
+      email: "user@padelgo.id",
       password: userPassword,
       role: "USER",
     },
@@ -51,22 +51,31 @@ async function main() {
         name: "Padel Court A (Premium)",
         location: "Banyumanik, Semarang",
         pricePerHour: 150000,
-        images: [{ url: "/images/court-1.jpg", isDefault: true, isActive: true }],
-        description: "Lapangan premium",
+        images: [
+          { url: "/images/padel-premium.jpg", isDefault: true, isActive: true },
+        ],
+        description:
+          "Lapangan padel premium dengan kualitas permukaan terbaik, pencahayaan optimal, dan area bermain yang luas. Cocok untuk pemain serius yang mengutamakan performa dan kenyamanan dalam setiap pertandingan.",
       },
       {
         name: "Indoor Panoramic Court",
         location: "Tembalang, Semarang",
         pricePerHour: 200000,
-        images: [{ url: "/images/court-2.jpg", isDefault: true, isActive: true }],
-        description: "Lapangan indoor santai",
+        images: [
+          { url: "/images/padel-indoor.jpg", isDefault: true, isActive: true },
+        ],
+        description:
+          "Lapangan indoor modern dengan desain panoramic yang memberikan pengalaman bermain eksklusif. Terlindung dari cuaca, dilengkapi pencahayaan maksimal, ideal untuk bermain kapan saja tanpa gangguan.",
       },
       {
         name: "Outdoor Classic Court",
         location: "Simpang Lima, Semarang",
         pricePerHour: 120000,
-        images: [{ url: "/images/court-3.jpg", isDefault: true, isActive: true }],
-        description: "Lapangan outdoor santai",
+        images: [
+          { url: "/images/padel-outdoor.jpg", isDefault: true, isActive: true },
+        ],
+        description:
+          "Lapangan outdoor dengan suasana santai dan udara terbuka di pusat kota. Cocok untuk bermain bersama teman atau keluarga sambil menikmati atmosfer kota yang hidup.",
       },
     ],
   });
