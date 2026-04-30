@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { BookingManager } from "./BookingManager";
 import { CourtManager } from "./CourtManager";
 import { CourtSchedule } from "./CourtSchedule";
@@ -69,7 +70,15 @@ function StatCard({ item }: { item: StatItem }) {
 }
 
 export function AdminDashboard({ initialBookings, stats }: Props) {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("bookings");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") as TabId;
+    if (tab && TABS.some((t) => t.id === tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const pendingActionCount = initialBookings.filter(b => 
     ["PENDING", "PERLU_VERIFIKASI", "RESCHEDULE_REQUESTED"].includes(b.status)

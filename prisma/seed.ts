@@ -37,7 +37,7 @@ async function main() {
   // 👤 USER
   await prisma.user.create({
     data: {
-      name: "User",
+      name: "Apiipp",
       email: "user@padelgo.id",
       password: userPassword,
       role: "USER",
@@ -50,7 +50,7 @@ async function main() {
       {
         name: "Padel Court A (Premium)",
         location: "Banyumanik, Semarang",
-        pricePerHour: 150000,
+        pricePerHour: 500000,
         images: [
           { url: "/images/padel-premium.jpg", isDefault: true, isActive: true },
         ],
@@ -70,7 +70,7 @@ async function main() {
       {
         name: "Outdoor Classic Court",
         location: "Simpang Lima, Semarang",
-        pricePerHour: 120000,
+        pricePerHour: 300000,
         images: [
           { url: "/images/padel-outdoor.jpg", isDefault: true, isActive: true },
         ],

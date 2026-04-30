@@ -132,6 +132,20 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
 
+    // Verify user still exists in DB (to prevent P2003 if DB was reset)
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!userExists) {
+      console.warn(`API: Session user ${userId} not found in database. Stale session?`);
+      return NextResponse.json(
+        { error: "Sesi tidak valid atau user tidak ditemukan. Silakan logout dan login kembali." },
+        { status: 401 }
+      );
+    }
+
     const body: unknown = await req.json();
     const payload = (body ?? {}) as Record<string, unknown>;
     const courtId = payload.courtId;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { fetchJson } from "@/lib/fetchJson";
@@ -85,6 +86,7 @@ const FEATURES = [
 ];
 
 export default function Home() {
+  const { data: session } = useSession();
   const [courts, setCourts] = useState<
     {
       id: string;
@@ -238,7 +240,7 @@ export default function Home() {
                             / jam
                           </span>
                         </span>
-                        <Link href={`/booking?courtId=${court.id}`}>
+                        <Link href={session?.user?.role === "ADMIN" ? "/admin?tab=schedule" : `/booking?courtId=${court.id}`}>
                           <Button size="sm" variant="secondary">
                             Cek Jadwal
                           </Button>
