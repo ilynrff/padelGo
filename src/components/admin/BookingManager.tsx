@@ -76,10 +76,6 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
   
   // New Filter & Search states
   const [dateFilter, setDateFilter] = useState<string>("");
-  const [serverSearchCode, setServerSearchCode] = useState("");
-  const [searchedBooking, setSearchedBooking] = useState<Booking | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastQueue, setToastQueue] = useState<{ msg: string; type: "success" | "error" }[]>([]);
 
@@ -112,10 +108,9 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
       
       setBookings(newData);
 
-      // Auto-update any open modals or search results so they reflect latest status
+      // Auto-update any open modals so they reflect latest status
       if (isSilent) {
         setSelected(prev => prev ? (newData.find(b => b.id === prev.id) || prev) : null);
-        setSearchedBooking(prev => prev ? (newData.find(b => b.id === prev.id) || prev) : null);
       }
     } catch (e) { 
       if (!isSilent) showToast(getErrorMessage(e) || "Error", "error"); 
@@ -178,30 +173,6 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
     finally { setIsProcessing(false); }
   };
 
-  const handleSearchByCode = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!serverSearchCode.trim()) return;
-    
-    setIsSearching(true);
-    setSearchError("");
-    setSearchedBooking(null);
-    
-    try {
-      const data = await fetchJson<Booking>(`/api/admin/bookings/search?code=${serverSearchCode}`);
-      setSearchedBooking(data);
-    } catch (e: any) {
-      setSearchError("Booking tidak ditemukan");
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleClearSearch = () => {
-    setServerSearchCode("");
-    setSearchedBooking(null);
-    setSearchError("");
-  };
-
   const getTodayStr = () => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
@@ -239,83 +210,9 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
         {toastQueue.map((t, i) => <Toast key={i} isOpen message={t.msg} type={t.type} onClose={() => {}} />)}
       </div>
 
-      {/* Global Search By Code */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6">
-        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-3">Cari Kode Booking</h3>
-        <form onSubmit={handleSearchByCode} className="flex gap-2">
-          <input
-            type="text" 
-            placeholder="Masukkan kode booking (contoh: PDL-2026-0001)"
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-            value={serverSearchCode} 
-            onChange={(e) => setServerSearchCode(e.target.value)}
-          />
-          <Button type="submit" isLoading={isSearching} disabled={!serverSearchCode.trim()}>
-            Cari
-          </Button>
-          {searchedBooking && (
-            <Button variant="outline" type="button" onClick={handleClearSearch}>
-              Clear
-            </Button>
-          )}
-        </form>
-        {searchError && (
-          <p className="mt-3 text-sm font-bold text-red-600 flex items-center gap-2">
-            ⚠️ {searchError}
-          </p>
-        )}
-      </div>
 
-      {/* Search Result Override */}
-      {searchedBooking ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-800">Hasil Pencarian</h2>
-            <button onClick={handleClearSearch} className="text-sm font-bold text-slate-500 hover:text-slate-800 underline">
-              Kembali ke Daftar
-            </button>
-          </div>
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-blue-600 text-white px-4 py-1 rounded-bl-xl text-xs font-black uppercase tracking-widest">
-              Matched
-            </div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <p className="text-3xl font-black text-blue-900 tracking-tight">{searchedBooking.bookingCode || searchedBooking.id.slice(0, 8)}</p>
-                <div className="flex flex-wrap gap-2 items-center">
-                  <StatusPill status={searchedBooking.status} />
-                  <span className="text-sm font-bold text-slate-600">
-                    {String(searchedBooking.date).slice(0, 10)} • {formatMinutesToHHmm(searchedBooking.startTime)} - {formatMinutesToHHmm(searchedBooking.endTime)}
-                  </span>
-                </div>
-                <p className="text-sm font-bold text-slate-700">
-                  👤 {searchedBooking.user?.name} | 🎾 {searchedBooking.court?.name}
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                {["CONFIRMED", "RESCHEDULE_APPROVED"].includes(searchedBooking.status) && (
-                  <Button 
-                    onClick={async () => {
-                      await checkIn(searchedBooking.bookingCode || "");
-                      handleSearchByCode(); // Refresh the search result
-                    }}
-                    isLoading={isProcessing}
-                    className="shadow-md bg-blue-600 hover:bg-blue-700"
-                  >
-                    📍 Confirm Check-in
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => setSelected(searchedBooking)}>
-                  Lihat Detail Penuh
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Filters */}
-          <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+      {/* Filters */}
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
             {/* Date Filters */}
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest mr-2">Filter Tanggal:</span>
@@ -350,7 +247,7 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
             {/* Existing List Filters */}
             <div className="flex flex-wrap gap-2 items-center">
               <input
-                type="text" placeholder="Cari user / court…"
+                type="text" placeholder="Cari user / court / kode booking..."
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1 min-w-[160px]"
                 value={search} onChange={(e) => setSearch(e.target.value)}
               />
@@ -441,8 +338,6 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
               );
             })}
           </div>
-        </>
-      )}
 
       {/* Detail Modal */}
       {selected && (
