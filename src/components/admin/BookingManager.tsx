@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { formatMinutesToHHmm } from "@/lib/bookingTime";
@@ -65,6 +66,7 @@ function CourtAvailTag({ booking }: { booking: Booking }) {
 }
 
 export function BookingManager({ initialBookings = [], isLoading = false, defaultFilter }: Props) {
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState(defaultFilter ?? "all");
@@ -132,8 +134,9 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
         body: JSON.stringify({ status }),
       });
       setBookings((prev) => prev.map((b) => (b.id === id ? data : b)));
-      if (selected?.id === id) setSelected(data);
       showToast(`Status berhasil diubah ke ${STATUS_CONFIG[status]?.label ?? status}`, "success");
+      router.refresh();
+      setSelected(null);
     } catch (e) { showToast(getErrorMessage(e) || "Gagal update", "error"); }
     finally { setIsProcessing(false); }
   };
@@ -149,6 +152,7 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal check-in");
       showToast("Check-in berhasil", "success");
+      router.refresh();
       await refresh();
       setSelected(null);
     } catch (e: any) {
@@ -167,8 +171,9 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
         body: JSON.stringify({ action }),
       });
       setBookings((prev) => prev.map((b) => (b.id === id ? data : b)));
-      if (selected?.id === id) setSelected(data);
       showToast(`Reschedule berhasil di-${action}`, "success");
+      router.refresh();
+      setSelected(null);
     } catch (e) { showToast(getErrorMessage(e) || "Gagal", "error"); }
     finally { setIsProcessing(false); }
   };
