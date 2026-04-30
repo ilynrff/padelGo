@@ -224,7 +224,7 @@ export default function Home() {
                       <h3 className="text-xl font-black text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
                         {court.name}
                       </h3>
-                      <p className="text-slate-500 font-medium text-sm mb-6 flex-1 leading-relaxed">
+                      <p className="text-sm text-slate-600 leading-relaxed mb-6 flex-1 text-left line-clamp-7">
                         {court.description ||
                           "Fasilitas berkualitas untuk pengalaman bermain terbaik."}
                       </p>

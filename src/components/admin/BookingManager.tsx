@@ -375,47 +375,66 @@ export function BookingManager({ initialBookings = [], isLoading = false, defaul
                 Belum ada booking.
               </div>
             )}
-            {!isLoading && filtered.map((b) => (
-              <div key={b.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col">
-                {/* Court image strip */}
-                <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-400" />
-                <div className="p-4 flex-1 space-y-2">
-                  {/* Court name */}
-                  <div className="font-black text-slate-900 text-sm truncate" title={b.court?.name ?? "—"}>
-                    {b.court?.name ?? "—"}
+            {!isLoading && filtered.map((b) => {
+              const isActionNeeded = ["PENDING", "PERLU_VERIFIKASI", "RESCHEDULE_REQUESTED"].includes(b.status.toUpperCase());
+              
+              return (
+                <div key={b.id}
+                  className={`relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col
+                    ${isActionNeeded ? "bg-amber-50/50 border-l-4 border-l-amber-400 shadow-[0_4px_20px_-4px_rgba(251,191,36,0.1)]" : ""}
+                  `}>
+                  
+                  {/* Action Needed Badge */}
+                  {isActionNeeded && (
+                    <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-bl-lg flex items-center gap-1 shadow-sm">
+                      <span className="animate-pulse">🔔</span> Action Needed
+                    </div>
+                  )}
+
+                  {/* Court image strip */}
+                  <div className={`h-1.5 bg-gradient-to-r ${isActionNeeded ? "from-amber-400 to-amber-300" : "from-blue-500 to-blue-400"}`} />
+                  
+                  <div className="p-4 flex-1 space-y-2">
+                    {/* Court name */}
+                    <div className="font-black text-slate-900 text-sm truncate pr-16" title={b.court?.name ?? "—"}>
+                      {b.court?.name ?? "—"}
+                    </div>
+                    {/* User */}
+                    <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
+                      {b.user?.name ?? "—"}
+                    </div>
+                    {/* Booking Code */}
+                    <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                      {b.bookingCode || "OLD DATA"}
+                    </div>
+                    {/* Date & time */}
+                    <div className="text-xs font-bold text-slate-700">
+                      {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
+                    </div>
+                    {/* Price */}
+                    <div className="text-sm font-black text-blue-700">
+                      Rp {Number(b.totalPrice ?? 0).toLocaleString("id-ID")}
+                    </div>
+                    {/* Status row */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StatusPill status={b.status} />
+                      <CourtAvailTag booking={b} />
+                    </div>
                   </div>
-                  {/* User */}
-                  <div className="text-xs text-slate-500 font-semibold truncate" title={b.user?.name ?? "—"}>
-                    {b.user?.name ?? "—"}
-                  </div>
-                  {/* Booking Code */}
-                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                    {b.bookingCode || "OLD DATA"}
-                  </div>
-                  {/* Date & time */}
-                  <div className="text-xs font-bold text-slate-700">
-                    {String(b.date).slice(0, 10)} · {formatMinutesToHHmm(b.startTime)}–{formatMinutesToHHmm(b.endTime)}
-                  </div>
-                  {/* Price */}
-                  <div className="text-sm font-black text-blue-700">
-                    Rp {Number(b.totalPrice ?? 0).toLocaleString("id-ID")}
-                  </div>
-                  {/* Status row */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <StatusPill status={b.status} />
-                    <CourtAvailTag booking={b} />
+                  {/* Footer */}
+                  <div className="border-t border-slate-100 px-4 py-3">
+                    <button onClick={() => setSelected(b)}
+                      className={`w-full text-xs font-black rounded-xl py-2 active:scale-95 transition-all
+                        ${isActionNeeded 
+                          ? "bg-amber-500 text-white shadow-sm hover:bg-amber-600" 
+                          : "text-blue-600 border border-blue-200 hover:bg-blue-50"}
+                      `}>
+                      Lihat Detail & Proses
+                    </button>
                   </div>
                 </div>
-                {/* Footer */}
-                <div className="border-t border-slate-100 px-4 py-3">
-                  <button onClick={() => setSelected(b)}
-                    className="w-full text-xs font-black text-blue-600 border border-blue-200 rounded-xl py-2 hover:bg-blue-50 active:scale-95 transition-all">
-                    Lihat Detail
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

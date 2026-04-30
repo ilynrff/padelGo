@@ -221,7 +221,7 @@ export default function BookingPage() {
                     <p className="text-slate-500 font-medium flex items-center gap-2 mb-6">
                       📍 {previewCourt?.location || "Lokasi belum ditentukan"}
                     </p>
-                    <p className="text-slate-600 leading-relaxed font-medium mb-8">
+                    <p className="text-base text-slate-600 leading-relaxed mb-8 text-left">
                       {previewCourt?.description ||
                         "Nikmati bermain padel di lapangan premium dengan standar internasional. Dilengkapi dengan fasilitas terbaik, pencahayaan anti-silau, dan lingkungan yang asri."}
                     </p>

@@ -39,7 +39,7 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
 
         {/* Selected checkmark */}
         {isSelected && (
-          <div className="absolute top-3 right-3 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
+          <div className="absolute top-2 right-3 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
             <svg
               width="16"
               height="16"
@@ -63,7 +63,7 @@ export function CourtCard({ court, isSelected, onSelect }: CourtCardProps) {
           {court.name}
         </h3>
         {court.description && (
-          <p className="text-xs text-slate-500 font-medium mb-3 line-clamp-2">
+          <p className="text-sm text-slate-600 leading-relaxed mb-4 line-clamp-3 text-left">
             {court.description}
           </p>
         )}

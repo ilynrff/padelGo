@@ -39,10 +39,9 @@ type Props = {
 };
 
 const TABS = [
-  { id: "overview",  label: "Dashboard",         icon: "📊" },
-  { id: "schedule",  label: "Jadwal Lapangan",   icon: "📅" },
-  { id: "bookings",  label: "Manajemen Booking",  icon: "📋" },
-  { id: "courts",    label: "Kelola Lapangan",    icon: "🏟️" },
+  { id: "bookings",  label: "Booking Management", icon: "📋" },
+  { id: "schedule",  label: "Jadwal Lapangan",    icon: "📅" },
+  { id: "courts",    label: "Kelola Lapangan",     icon: "🏟️" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -70,7 +69,11 @@ function StatCard({ item }: { item: StatItem }) {
 }
 
 export function AdminDashboard({ initialBookings, stats }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activeTab, setActiveTab] = useState<TabId>("bookings");
+
+  const pendingActionCount = initialBookings.filter(b => 
+    ["PENDING", "PERLU_VERIFIKASI", "RESCHEDULE_REQUESTED"].includes(b.status)
+  ).length;
 
   return (
     <div className="space-y-0">
@@ -80,12 +83,14 @@ export function AdminDashboard({ initialBookings, stats }: Props) {
           <nav className="flex gap-1 overflow-x-auto" aria-label="Admin navigation">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.id;
+              const isBookingTab = tab.id === "bookings";
+              
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex items-center gap-2 px-4 py-3.5 text-sm font-bold whitespace-nowrap border-b-2 transition-all duration-150
+                    flex items-center gap-2 px-4 py-3.5 text-sm font-bold whitespace-nowrap border-b-2 transition-all duration-150 relative
                     ${isActive
                       ? "border-blue-600 text-blue-700 bg-blue-50/50"
                       : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"}
@@ -93,6 +98,11 @@ export function AdminDashboard({ initialBookings, stats }: Props) {
                 >
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {isBookingTab && pendingActionCount > 0 && (
+                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                      {pendingActionCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -102,39 +112,24 @@ export function AdminDashboard({ initialBookings, stats }: Props) {
 
       {/* Tab Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* ── OVERVIEW ── */}
-        {activeTab === "overview" && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-2xl font-black text-slate-900">Overview</h2>
-              <p className="text-slate-500 font-medium mt-1">Ringkasan aktivitas booking hari ini</p>
-            </div>
-
+        {/* ── MANAJEMEN BOOKING (NEW MAIN PAGE) ── */}
+        {activeTab === "bookings" && (
+          <div className="space-y-10">
+            {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {stats.map((s) => (
                 <StatCard key={s.label} item={s} />
               ))}
             </div>
 
-            {/* Quick: recent bookings needing action */}
-            <div>
-              <h3 className="text-base font-black text-slate-800 mb-4 flex items-center gap-2">
-                ⚡ Membutuhkan Tindakan
-              </h3>
-              <BookingManager
-                initialBookings={initialBookings}
-                defaultFilter="RESCHEDULE_REQUESTED"
-              />
-            </div>
-
-            <div>
-              <h3 className="text-base font-black text-slate-800 mb-4">
-                🕐 Menunggu Verifikasi Pembayaran
-              </h3>
-              <BookingManager
-                initialBookings={initialBookings}
-                defaultFilter="PERLU_VERIFIKASI"
-              />
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">Booking Management</h2>
+                <p className="text-slate-500 font-medium mt-1">
+                  Kelola semua reservasi — approve, reject, atau reschedule
+                </p>
+              </div>
+              <BookingManager initialBookings={initialBookings} />
             </div>
           </div>
         )}
@@ -149,19 +144,6 @@ export function AdminDashboard({ initialBookings, stats }: Props) {
               </p>
             </div>
             <CourtSchedule />
-          </div>
-        )}
-
-        {/* ── MANAJEMEN BOOKING ── */}
-        {activeTab === "bookings" && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-slate-900">Manajemen Booking</h2>
-              <p className="text-slate-500 font-medium mt-1">
-                Kelola semua reservasi — approve, reject, atau reschedule
-              </p>
-            </div>
-            <BookingManager initialBookings={initialBookings} />
           </div>
         )}
 
