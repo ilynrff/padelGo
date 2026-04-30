@@ -9,6 +9,7 @@ import {
   parseHHmmToMinutes,
   parseSlotToRange,
   coerceDateOnlyUTC,
+  getVirtualStatus,
 } from "@/lib/bookingTime";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { validateBookingMonth } from "@/lib/dateValidation";
@@ -102,6 +103,7 @@ export async function GET(req: Request) {
 
     const bookings = rawBookings.map(b => ({
       ...b,
+      status: getVirtualStatus(b),
       court: b.court ? {
         ...b.court,
         images: normalizeImages(b.court.images)

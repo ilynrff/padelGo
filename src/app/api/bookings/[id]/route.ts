@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { getVirtualStatus } from "@/lib/bookingTime";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,7 +36,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       booking.court.images = normalizeImages(booking.court.images) as any;
     }
 
-    return NextResponse.json(booking);
+    return NextResponse.json({
+      ...booking,
+      status: getVirtualStatus(booking as any),
+    });
   } catch (error: unknown) {
     return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(error) }, { status: 500 });
   }
@@ -125,7 +129,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     });
 
     if (!updatedBooking) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(updatedBooking);
+    return NextResponse.json({
+      ...updatedBooking,
+      status: getVirtualStatus(updatedBooking as any),
+    });
   } catch (error: unknown) {
     console.error("Error updating booking:", error);
     return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(error) }, { status: 500 });

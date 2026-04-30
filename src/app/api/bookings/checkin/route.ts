@@ -31,24 +31,37 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Optional: Check if time is within valid range (30 mins before start until end)
+    // Check-in validation window (Semarang time UTC+7)
     const now = new Date();
-    // Booking date is in UTC, midnight. Start/End times are minutes from midnight.
-    const startTime = new Date(booking.date);
-    startTime.setUTCMinutes(startTime.getUTCMinutes() + booking.startTime - 30); // 30 mins before
+    const localNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const localTodayStr = localNow.toISOString().split('T')[0];
+    const bookingDateStr = new Date(booking.date).toISOString().split('T')[0];
     
-    const endTime = new Date(booking.date);
-    endTime.setUTCMinutes(endTime.getUTCMinutes() + booking.endTime);
+    // Current minutes from midnight in local time
+    const nowMinutes = localNow.getUTCHours() * 60 + localNow.getUTCMinutes();
 
-    if (now < startTime) {
+    if (bookingDateStr > localTodayStr) {
       return NextResponse.json({ 
-        error: "Terlalu cepat untuk check-in. Maksimal 30 menit sebelum jadwal." 
+        error: "Belum waktunya bermain (jadwal untuk hari mendatang)." 
+      }, { status: 400 });
+    }
+    
+    if (bookingDateStr < localTodayStr) {
+      return NextResponse.json({ 
+        error: "Waktu bermain sudah selesai (jadwal hari sudah lewat)." 
       }, { status: 400 });
     }
 
-    if (now > endTime) {
+    // Same day validation
+    if (nowMinutes < (booking.startTime - 10)) {
       return NextResponse.json({ 
-        error: "Jadwal sudah berakhir, tidak bisa check-in." 
+        error: "Check-in hanya bisa dilakukan maksimal 10 menit sebelum jadwal" 
+      }, { status: 400 });
+    }
+
+    if (nowMinutes > booking.endTime) {
+      return NextResponse.json({ 
+        error: "Waktu bermain sudah selesai" 
       }, { status: 400 });
     }
 

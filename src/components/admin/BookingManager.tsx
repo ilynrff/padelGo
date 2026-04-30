@@ -37,7 +37,8 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   CHECKED_IN:            { label: "Checked In",          bg: "bg-sky-100",    text: "text-sky-700" },
   CANCELLED:             { label: "Cancelled",           bg: "bg-red-100",    text: "text-red-700" },
   EXPIRED:               { label: "Expired",             bg: "bg-slate-200",  text: "text-slate-600" },
-  COMPLETED:             { label: "Completed",           bg: "bg-blue-100",   text: "text-blue-700" },
+  COMPLETED:             { label: "Completed",           bg: "bg-slate-100",  text: "text-slate-500" },
+  ONGOING:               { label: "🔴 Sedang Main",      bg: "bg-indigo-100", text: "text-indigo-700" },
   RESCHEDULE_REQUESTED:  { label: "Reschedule ⏳",       bg: "bg-violet-100", text: "text-violet-700" },
   RESCHEDULE_APPROVED:   { label: "Reschedule ✓",       bg: "bg-teal-100",   text: "text-teal-700" },
   RESCHEDULE_REJECTED:   { label: "Reschedule ✕",       bg: "bg-rose-100",   text: "text-rose-700" },
@@ -54,15 +55,16 @@ function StatusPill({ status }: { status: string }) {
 
 function CourtAvailTag({ booking }: { booking: Booking }) {
   const s = String(booking.status).toUpperCase();
+  // If it's already ONGOING or COMPLETED, the status badge covers it
+  if (["ONGOING", "COMPLETED"].includes(s)) return null;
   if (!["CONFIRMED", "RESCHEDULE_APPROVED"].includes(s)) return null;
+
   const now = new Date();
   const start = new Date(booking.date);
   start.setUTCMinutes(start.getUTCMinutes() + booking.startTime);
-  const end = new Date(booking.date);
-  end.setUTCMinutes(end.getUTCMinutes() + booking.endTime);
-  if (now >= start && now < end) return <span className="text-[11px] font-bold text-red-600">🔴 Sedang Dipakai</span>;
+  
   if (now < start) return <span className="text-[11px] font-bold text-amber-600">🟡 Akan Dipakai</span>;
-  return <span className="text-[11px] font-medium text-slate-400">Selesai</span>;
+  return null;
 }
 
 export function BookingManager({ initialBookings = [], isLoading = false, defaultFilter }: Props) {
