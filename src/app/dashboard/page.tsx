@@ -38,7 +38,6 @@ type Booking = {
   expiresAt?: string;
   court?: { id?: string; name?: string };
   payment?: { status?: string } | null;
-  bookingCode?: string | null;
 };
 
 import React from "react";
