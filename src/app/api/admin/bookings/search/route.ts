@@ -1,3 +1,5 @@
+
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -16,23 +18,38 @@ export async function GET(req: Request) {
     const code = searchParams.get("code");
 
     if (!code) {
-      return NextResponse.json({ error: "Booking code is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Booking code is required" },
+        { status: 400 },
+      );
     }
 
     const booking = await prisma.booking.findUnique({
       where: { bookingCode: code },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        court: { select: { id: true, name: true, location: true, pricePerHour: true, images: true } },
-        payment: { select: { id: true, status: true, proofImage: true, createdAt: true } },
+        court: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+            pricePerHour: true,
+            images: true,
+          },
+        },
+        payment: {
+          select: { id: true, status: true, proofImage: true, createdAt: true },
+        },
       },
     });
 
     if (!booking) {
-      return NextResponse.json({ error: "Booking tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Booking tidak ditemukan" },
+        { status: 404 },
+      );
     }
 
-    // Normalize court images
     if (booking.court) {
       booking.court.images = normalizeImages(booking.court.images) as any;
     }
@@ -40,6 +57,9 @@ export async function GET(req: Request) {
     return NextResponse.json(booking, { status: 200 });
   } catch (err: unknown) {
     console.error("API Error [GET /api/admin/bookings/search]:", err);
-    return NextResponse.json({ error: "Internal Server Error", details: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error", details: getErrorMessage(err) },
+      { status: 500 },
+    );
   }
 }

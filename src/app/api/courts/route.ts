@@ -61,8 +61,13 @@ export async function GET() {
 
     console.log(`API: Found ${courts.length} courts.`);
     return NextResponse.json(courts, { status: 200 });
-  } catch (error: unknown) {
-    console.error("API Error [GET /api/courts]:", error);
+  } catch (error: any) {
+    console.error("API Error [GET /api/courts]:", {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause,
+      code: error.code
+    });
     return NextResponse.json({
       error: "Failed to fetch courts.",
       details: getErrorMessage(error),
