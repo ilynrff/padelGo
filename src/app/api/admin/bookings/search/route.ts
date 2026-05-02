@@ -1,11 +1,11 @@
-
-
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { normalizeImages } from "@/lib/courtUtils";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
